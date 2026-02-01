@@ -33,7 +33,6 @@ if "settings" not in st.session_state:
         "api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
         "default_buffer": 20,
         "default_cd_target": 30,
-        "theme": "light",
     }
 
 
@@ -120,49 +119,6 @@ with col2:
 
 st.markdown("---")
 
-# Display Settings
-st.subheader("Display Settings")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    theme = st.selectbox(
-        "Color Theme",
-        options=["Light", "Dark", "System"],
-        index=["Light", "Dark", "System"].index(
-            st.session_state.settings.get("theme", "Light").capitalize()
-        ),
-        help="Color theme for the application",
-    )
-    st.caption("Note: Theme changes require a page refresh to take effect.")
-
-with col2:
-    st.markdown("**Severity Colors:**")
-    st.markdown(
-        """
-        <div style="display: flex; gap: 20px; margin-top: 10px;">
-            <div style="display: flex; align-items: center;">
-                <span style="background-color: #e74c3c; width: 20px; height: 20px;
-                     border-radius: 4px; display: inline-block; margin-right: 8px;"></span>
-                Critical
-            </div>
-            <div style="display: flex; align-items: center;">
-                <span style="background-color: #f39c12; width: 20px; height: 20px;
-                     border-radius: 4px; display: inline-block; margin-right: 8px;"></span>
-                Moderate
-            </div>
-            <div style="display: flex; align-items: center;">
-                <span style="background-color: #3498db; width: 20px; height: 20px;
-                     border-radius: 4px; display: inline-block; margin-right: 8px;"></span>
-                Low
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-st.markdown("---")
-
 # Save settings
 col1, col2, col3 = st.columns([1, 1, 2])
 
@@ -172,13 +128,7 @@ with col1:
             "api_key": api_key,
             "default_buffer": default_buffer,
             "default_cd_target": default_cd_target,
-            "theme": theme.lower(),
         }
-
-        # Set environment variable for API key
-        if api_key:
-            os.environ["ANTHROPIC_API_KEY"] = api_key
-
         st.success("Settings saved successfully!")
 
 with col2:
@@ -187,7 +137,6 @@ with col2:
             "api_key": "",
             "default_buffer": 20,
             "default_cd_target": 30,
-            "theme": "light",
         }
         st.rerun()
 
@@ -200,7 +149,6 @@ config_display = {
     "API Key": "Configured" if st.session_state.settings["api_key"] else "Not configured",
     "Default Buffer": f"{st.session_state.settings['default_buffer']}%",
     "Default CD Target": f"{st.session_state.settings['default_cd_target']}%",
-    "Theme": st.session_state.settings["theme"].capitalize(),
 }
 
 col1, col2 = st.columns(2)
