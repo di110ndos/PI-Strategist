@@ -1,8 +1,15 @@
 """Full DED analysis page."""
 
+import sys
+from pathlib import Path
+
+# Add src directory to path for Streamlit Cloud deployment
+_src_dir = Path(__file__).parent.parent.parent.parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
 import io
 import streamlit as st
-from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Optional
 

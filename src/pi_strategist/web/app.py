@@ -1,7 +1,15 @@
 """Main Streamlit entry point for PI Strategist."""
 
-import streamlit as st
+import sys
 from pathlib import Path
+
+# Add src directory to path for Streamlit Cloud deployment
+# This must happen before any pi_strategist imports (including in pages)
+_src_dir = Path(__file__).parent.parent.parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
+import streamlit as st
 
 
 def main():

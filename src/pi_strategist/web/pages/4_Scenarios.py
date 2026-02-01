@@ -1,5 +1,13 @@
 """What-If Scenario Planning page."""
 
+import sys
+from pathlib import Path
+
+# Add src directory to path for Streamlit Cloud deployment
+_src_dir = Path(__file__).parent.parent.parent.parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
 import streamlit as st
 from copy import deepcopy
 from dataclasses import dataclass, field

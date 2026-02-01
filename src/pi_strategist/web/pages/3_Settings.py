@@ -1,8 +1,15 @@
 """Settings page for PI Strategist configuration."""
 
+import sys
+from pathlib import Path
+
+# Add src directory to path for Streamlit Cloud deployment
+_src_dir = Path(__file__).parent.parent.parent.parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
 import streamlit as st
 import os
-from pathlib import Path
 
 from pi_strategist.web.components.session_status import render_session_status
 
