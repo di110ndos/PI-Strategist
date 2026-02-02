@@ -196,10 +196,8 @@ Default buffer: 20%
 
 | Strategy | Use Case |
 |----------|----------|
-| Feature Flag | UI changes, user-facing features |
-| Canary | High-risk domains (auth, payment) |
-| Blue-Green | API changes, zero-downtime requirements |
-| Dark Launch | Analytics, background features |
+| Feature Flag | UI, user, notification, analytics, search features - allows instant rollback |
+| Full Deployment | Auth, payment, data, API, admin domains - requires full testing before release |
 
 ## Project Structure
 
