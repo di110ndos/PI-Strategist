@@ -6,8 +6,12 @@ from typing import Optional
 from pi_strategist.models import (
     AcceptanceCriteria,
     DEDDocument,
+    Obligation,
+    ObligationType,
     RedFlag,
     RedFlagSeverity,
+    SLAFinding,
+    SLAMetricType,
 )
 
 
@@ -466,3 +470,348 @@ class RiskAnalyzer:
 
         sorted_terms = sorted(counts.items(), key=lambda x: x[1], reverse=True)
         return sorted_terms[:top_n]
+
+    # ==================== Obligation Detection ====================
+
+    # Patterns for obligation detection
+    OBLIGATION_PATTERNS = {
+        ObligationType.SHALL_NOT: re.compile(
+            r"(?P<subject>[\w\s]+?)\s+shall\s+not\s+(?P<action>.+?)(?:[,.]|$)",
+            re.IGNORECASE
+        ),
+        ObligationType.MUST_NOT: re.compile(
+            r"(?P<subject>[\w\s]+?)\s+must\s+not\s+(?P<action>.+?)(?:[,.]|$)",
+            re.IGNORECASE
+        ),
+        ObligationType.WILL_NOT: re.compile(
+            r"(?P<subject>[\w\s]+?)\s+will\s+not\s+(?P<action>.+?)(?:[,.]|$)",
+            re.IGNORECASE
+        ),
+        ObligationType.SHALL: re.compile(
+            r"(?P<subject>[\w\s]+?)\s+shall\s+(?P<action>.+?)(?:[,.]|$)",
+            re.IGNORECASE
+        ),
+        ObligationType.MUST: re.compile(
+            r"(?P<subject>[\w\s]+?)\s+must\s+(?P<action>.+?)(?:[,.]|$)",
+            re.IGNORECASE
+        ),
+        ObligationType.WILL: re.compile(
+            r"(?P<subject>[\w\s]+?)\s+will\s+(?P<action>.+?)(?:[,.]|$)",
+            re.IGNORECASE
+        ),
+    }
+
+    def extract_obligations(self, text: str) -> list[Obligation]:
+        """Extract obligation statements from text.
+
+        Args:
+            text: Text to analyze for obligations
+
+        Returns:
+            List of detected obligations
+        """
+        obligations = []
+        lines = text.split("\n")
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Check negative patterns first (shall not, must not, will not)
+            for obl_type in [ObligationType.SHALL_NOT, ObligationType.MUST_NOT, ObligationType.WILL_NOT]:
+                pattern = self.OBLIGATION_PATTERNS[obl_type]
+                matches = pattern.finditer(line)
+                for match in matches:
+                    subject = match.group("subject").strip()
+                    action = match.group("action").strip()
+                    # Clean up subject (remove leading articles, etc.)
+                    subject = self._clean_subject(subject)
+                    if subject and action:
+                        obligations.append(Obligation(
+                            text=match.group(0).strip(),
+                            obligation_type=obl_type,
+                            subject=subject,
+                            action=action,
+                            source_line=line,
+                            is_negative=True,
+                        ))
+
+            # Check positive patterns (shall, must, will)
+            for obl_type in [ObligationType.SHALL, ObligationType.MUST, ObligationType.WILL]:
+                pattern = self.OBLIGATION_PATTERNS[obl_type]
+                matches = pattern.finditer(line)
+                for match in matches:
+                    # Skip if this is actually a negative (already captured)
+                    full_match = match.group(0)
+                    if " not " in full_match.lower():
+                        continue
+
+                    subject = match.group("subject").strip()
+                    action = match.group("action").strip()
+                    subject = self._clean_subject(subject)
+                    if subject and action:
+                        obligations.append(Obligation(
+                            text=full_match.strip(),
+                            obligation_type=obl_type,
+                            subject=subject,
+                            action=action,
+                            source_line=line,
+                            is_negative=False,
+                        ))
+
+        return obligations
+
+    def _clean_subject(self, subject: str) -> str:
+        """Clean up extracted subject text."""
+        # Remove leading articles and common prefixes
+        prefixes_to_remove = ["the ", "a ", "an ", "each ", "every ", "all "]
+        subject_lower = subject.lower()
+        for prefix in prefixes_to_remove:
+            if subject_lower.startswith(prefix):
+                subject = subject[len(prefix):]
+                break
+        return subject.strip()
+
+    def analyze_obligations(self, text: str) -> dict:
+        """Analyze text for obligations and provide summary.
+
+        Args:
+            text: Text to analyze
+
+        Returns:
+            Dictionary with obligations grouped by subject and type
+        """
+        obligations = self.extract_obligations(text)
+
+        # Group by subject
+        by_subject: dict[str, list[Obligation]] = {}
+        for obl in obligations:
+            subject_key = obl.subject.lower()
+            if subject_key not in by_subject:
+                by_subject[subject_key] = []
+            by_subject[subject_key].append(obl)
+
+        # Group by type
+        by_type: dict[str, list[Obligation]] = {}
+        for obl in obligations:
+            type_key = obl.obligation_type.value
+            if type_key not in by_type:
+                by_type[type_key] = []
+            by_type[type_key].append(obl)
+
+        return {
+            "obligations": obligations,
+            "by_subject": by_subject,
+            "by_type": by_type,
+            "total": len(obligations),
+            "binding_count": len([o for o in obligations if o.obligation_type in [ObligationType.SHALL, ObligationType.MUST, ObligationType.SHALL_NOT, ObligationType.MUST_NOT]]),
+            "commitment_count": len([o for o in obligations if o.obligation_type in [ObligationType.WILL, ObligationType.WILL_NOT]]),
+        }
+
+    # ==================== SLA/SLO Extraction ====================
+
+    # Patterns for SLA/SLO detection
+    SLA_PATTERNS = {
+        SLAMetricType.UPTIME: [
+            re.compile(r"(\d+(?:\.\d+)?)\s*%\s*uptime", re.IGNORECASE),
+            re.compile(r"uptime\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*%", re.IGNORECASE),
+        ],
+        SLAMetricType.AVAILABILITY: [
+            re.compile(r"(\d+(?:\.\d+)?)\s*%\s*availab", re.IGNORECASE),
+            re.compile(r"availab\w*\s*(?:of\s*)?(\d+(?:\.\d+)?)\s*%", re.IGNORECASE),
+        ],
+        SLAMetricType.RESPONSE_TIME: [
+            re.compile(r"response\s*time\s*(?:of\s*)?(?:less\s*than\s*|under\s*|within\s*|<\s*)?(\d+(?:\.\d+)?)\s*(ms|milliseconds?|seconds?|s|minutes?|m)\b", re.IGNORECASE),
+            re.compile(r"respond\s*(?:within\s*|in\s*(?:under\s*)?)?(\d+(?:\.\d+)?)\s*(ms|milliseconds?|seconds?|s|minutes?|m)\b", re.IGNORECASE),
+            re.compile(r"<\s*(\d+(?:\.\d+)?)\s*(ms|milliseconds?|seconds?|s)\s*response", re.IGNORECASE),
+        ],
+        SLAMetricType.LATENCY: [
+            re.compile(r"latency\s*(?:of\s*)?(?:less\s*than\s*|under\s*|<\s*)?(\d+(?:\.\d+)?)\s*(ms|milliseconds?|seconds?|s)\b", re.IGNORECASE),
+            re.compile(r"<\s*(\d+(?:\.\d+)?)\s*(ms|milliseconds?|seconds?|s)\s*latency", re.IGNORECASE),
+        ],
+        SLAMetricType.THROUGHPUT: [
+            re.compile(r"(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:requests?|transactions?|ops?|queries?|calls?)\s*(?:per\s*|/)\s*(second|sec|s|minute|min|m|hour|hr|h)\b", re.IGNORECASE),
+            re.compile(r"(\d+(?:,\d+)*(?:\.\d+)?)\s*(TPS|RPS|QPS)\b", re.IGNORECASE),
+            re.compile(r"throughput\s*(?:of\s*)?(\d+(?:,\d+)*(?:\.\d+)?)", re.IGNORECASE),
+        ],
+        SLAMetricType.ERROR_RATE: [
+            re.compile(r"error\s*rate\s*(?:of\s*)?(?:less\s*than\s*|under\s*|<\s*)?(\d+(?:\.\d+)?)\s*%", re.IGNORECASE),
+            re.compile(r"<\s*(\d+(?:\.\d+)?)\s*%\s*error", re.IGNORECASE),
+            re.compile(r"(\d+(?:\.\d+)?)\s*%\s*(?:error|failure)\s*rate", re.IGNORECASE),
+        ],
+        SLAMetricType.RECOVERY_TIME: [
+            re.compile(r"(?:RTO|recovery\s*time)\s*(?:of\s*)?(?:less\s*than\s*|under\s*|<\s*)?(\d+(?:\.\d+)?)\s*(ms|milliseconds?|seconds?|s|minutes?|m|hours?|h)\b", re.IGNORECASE),
+            re.compile(r"recover\s*(?:within\s*|in\s*)?(\d+(?:\.\d+)?)\s*(minutes?|m|hours?|h|seconds?|s)\b", re.IGNORECASE),
+        ],
+    }
+
+    # Unit normalization
+    UNIT_NORMALIZATION = {
+        "ms": "ms",
+        "millisecond": "ms",
+        "milliseconds": "ms",
+        "s": "seconds",
+        "sec": "seconds",
+        "second": "seconds",
+        "seconds": "seconds",
+        "m": "minutes",
+        "min": "minutes",
+        "minute": "minutes",
+        "minutes": "minutes",
+        "h": "hours",
+        "hr": "hours",
+        "hour": "hours",
+        "hours": "hours",
+        "tps": "transactions/second",
+        "rps": "requests/second",
+        "qps": "queries/second",
+    }
+
+    def extract_sla_metrics(self, text: str) -> list[SLAFinding]:
+        """Extract SLA/SLO metrics from text.
+
+        Args:
+            text: Text to analyze for SLA/SLO definitions
+
+        Returns:
+            List of detected SLA findings
+        """
+        findings = []
+        lines = text.split("\n")
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            for metric_type, patterns in self.SLA_PATTERNS.items():
+                for pattern in patterns:
+                    matches = pattern.finditer(line)
+                    for match in matches:
+                        value = match.group(1).replace(",", "")
+
+                        # Get unit if present
+                        unit = ""
+                        if metric_type in [SLAMetricType.UPTIME, SLAMetricType.AVAILABILITY, SLAMetricType.ERROR_RATE]:
+                            unit = "%"
+                        elif match.lastindex and match.lastindex >= 2:
+                            raw_unit = match.group(2).lower()
+                            unit = self.UNIT_NORMALIZATION.get(raw_unit, raw_unit)
+
+                        # Validate the SLA
+                        is_valid, warning = self._validate_sla(metric_type, value, unit)
+
+                        finding = SLAFinding(
+                            metric_type=metric_type,
+                            value=value,
+                            unit=unit,
+                            source_line=line,
+                            is_valid=is_valid,
+                            warning=warning,
+                        )
+
+                        # Avoid duplicates
+                        if not any(f.source_line == finding.source_line and f.metric_type == finding.metric_type and f.value == finding.value for f in findings):
+                            findings.append(finding)
+
+        return findings
+
+    def _validate_sla(self, metric_type: SLAMetricType, value: str, unit: str) -> tuple[bool, str]:
+        """Validate an SLA metric for reasonableness.
+
+        Returns:
+            Tuple of (is_valid, warning_message)
+        """
+        try:
+            num_value = float(value)
+        except ValueError:
+            return False, f"Invalid numeric value: {value}"
+
+        warnings = []
+
+        if metric_type in [SLAMetricType.UPTIME, SLAMetricType.AVAILABILITY]:
+            if num_value > 100:
+                return False, "Percentage cannot exceed 100%"
+            if num_value < 90:
+                warnings.append("Unusually low availability target")
+            if num_value >= 99.999:
+                warnings.append("'Five nines' (99.999%) is extremely difficult to achieve")
+            if num_value == 100:
+                warnings.append("100% uptime is unrealistic; consider 99.99% or similar")
+
+        elif metric_type == SLAMetricType.ERROR_RATE:
+            if num_value > 100:
+                return False, "Error rate cannot exceed 100%"
+            if num_value > 5:
+                warnings.append("Error rate target above 5% may indicate quality issues")
+
+        elif metric_type == SLAMetricType.RESPONSE_TIME:
+            if unit == "ms" and num_value > 30000:
+                warnings.append("Response time over 30 seconds may indicate a service timeout")
+            elif unit == "seconds" and num_value > 30:
+                warnings.append("Response time over 30 seconds may indicate a service timeout")
+
+        return True, "; ".join(warnings) if warnings else ""
+
+    def analyze_sla(self, text: str) -> dict:
+        """Analyze text for SLA/SLO metrics and provide summary.
+
+        Args:
+            text: Text to analyze
+
+        Returns:
+            Dictionary with SLA findings and analysis
+        """
+        findings = self.extract_sla_metrics(text)
+
+        # Group by metric type
+        by_type: dict[str, list[SLAFinding]] = {}
+        for finding in findings:
+            type_key = finding.metric_type.value
+            if type_key not in by_type:
+                by_type[type_key] = []
+            by_type[type_key].append(finding)
+
+        # Identify issues
+        issues = [f for f in findings if not f.is_valid or f.warning]
+
+        return {
+            "findings": findings,
+            "by_type": by_type,
+            "total": len(findings),
+            "valid_count": len([f for f in findings if f.is_valid]),
+            "with_warnings": len([f for f in findings if f.warning]),
+            "issues": issues,
+        }
+
+    def full_analysis(self, text: str) -> dict:
+        """Perform complete analysis including red flags, obligations, and SLAs.
+
+        Args:
+            text: Text to analyze
+
+        Returns:
+            Dictionary with all analysis results
+        """
+        # Red flags (using existing method)
+        red_flag_results = []
+        lines = text.strip().split("\n")
+        for line in lines:
+            line = line.strip()
+            if line:
+                flags = self.analyze_text(line)
+                if flags:
+                    red_flag_results.append({"line": line, "flags": flags})
+
+        # Obligations
+        obligation_results = self.analyze_obligations(text)
+
+        # SLA/SLO
+        sla_results = self.analyze_sla(text)
+
+        return {
+            "red_flags": red_flag_results,
+            "obligations": obligation_results,
+            "sla": sla_results,
+        }

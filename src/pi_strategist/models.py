@@ -13,6 +13,29 @@ class RedFlagSeverity(Enum):
     LOW = "low"
 
 
+class ObligationType(Enum):
+    """Types of obligation statements."""
+
+    SHALL = "shall"
+    MUST = "must"
+    WILL = "will"
+    SHALL_NOT = "shall not"
+    MUST_NOT = "must not"
+    WILL_NOT = "will not"
+
+
+class SLAMetricType(Enum):
+    """Types of SLA/SLO metrics."""
+
+    UPTIME = "uptime"
+    AVAILABILITY = "availability"
+    RESPONSE_TIME = "response_time"
+    LATENCY = "latency"
+    THROUGHPUT = "throughput"
+    ERROR_RATE = "error_rate"
+    RECOVERY_TIME = "recovery_time"
+
+
 class SprintStatus(Enum):
     """Sprint capacity status."""
 
@@ -49,6 +72,30 @@ class RedFlag:
     severity: RedFlagSeverity
     suggested_metric: str
     negotiation_script: str
+
+
+@dataclass
+class Obligation:
+    """Represents a detected obligation statement."""
+
+    text: str
+    obligation_type: ObligationType
+    subject: str  # Who is obligated (e.g., "the vendor", "the system")
+    action: str  # What they must do
+    source_line: str  # Original text containing the obligation
+    is_negative: bool = False  # True for "shall not", "must not", etc.
+
+
+@dataclass
+class SLAFinding:
+    """Represents a detected SLA/SLO metric."""
+
+    metric_type: SLAMetricType
+    value: str  # The numeric value (e.g., "99.9", "200")
+    unit: str  # The unit (e.g., "%", "ms", "seconds", "requests/second")
+    source_line: str  # Original text containing the SLA
+    is_valid: bool = True  # Whether the SLA is well-defined
+    warning: str = ""  # Any warnings about the SLA definition
 
 
 @dataclass
