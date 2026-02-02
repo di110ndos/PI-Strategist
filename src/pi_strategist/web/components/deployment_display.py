@@ -16,9 +16,7 @@ COLORS = {
 
 STRATEGY_COLORS = {
     DeploymentStrategy.FEATURE_FLAG: "#9b59b6",
-    DeploymentStrategy.CANARY: "#e67e22",
-    DeploymentStrategy.BLUE_GREEN: "#1abc9c",
-    DeploymentStrategy.DARK_LAUNCH: "#34495e",
+    DeploymentStrategy.FULL_DEPLOYMENT: "#27ae60",
 }
 
 
@@ -247,10 +245,8 @@ def render_strategy_legend() -> None:
     st.markdown("#### Deployment Strategies")
 
     strategies = [
-        (DeploymentStrategy.FEATURE_FLAG, "Feature Flag", "Toggle features on/off for specific users or groups"),
-        (DeploymentStrategy.CANARY, "Canary", "Gradually roll out to a small percentage of users first"),
-        (DeploymentStrategy.BLUE_GREEN, "Blue-Green", "Run two identical environments and switch traffic"),
-        (DeploymentStrategy.DARK_LAUNCH, "Dark Launch", "Deploy code without activating user-facing features"),
+        (DeploymentStrategy.FEATURE_FLAG, "Feature Flag", "Toggle features on/off for specific users or groups - allows instant rollback"),
+        (DeploymentStrategy.FULL_DEPLOYMENT, "Full Deployment", "Deploy complete feature to all users - requires full testing before release"),
     ]
 
     for strategy, name, description in strategies:

@@ -223,9 +223,7 @@ class DeploymentMap:
             margin-bottom: 10px;
         }}
         .strategy-feature_flag {{ background: #e3f2fd; color: #1565c0; }}
-        .strategy-canary {{ background: #fff3e0; color: #e65100; }}
-        .strategy-blue_green {{ background: #e8f5e9; color: #2e7d32; }}
-        .strategy-dark_launch {{ background: #fce4ec; color: #c2185b; }}
+        .strategy-full_deployment {{ background: #e8f5e9; color: #2e7d32; }}
         .meta-info {{
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -418,9 +416,7 @@ class DeploymentMap:
         """Format strategy name for display."""
         names = {
             DeploymentStrategy.FEATURE_FLAG: "Feature Flag",
-            DeploymentStrategy.CANARY: "Canary Release (10% -> 50% -> 100%)",
-            DeploymentStrategy.BLUE_GREEN: "Blue-Green Deployment",
-            DeploymentStrategy.DARK_LAUNCH: "Dark Launch",
+            DeploymentStrategy.FULL_DEPLOYMENT: "Full Deployment",
         }
         return names.get(strategy, strategy.value)
 

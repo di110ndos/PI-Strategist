@@ -47,9 +47,7 @@ class DeploymentStrategy(Enum):
     """Deployment strategy types."""
 
     FEATURE_FLAG = "feature_flag"
-    CANARY = "canary"
-    BLUE_GREEN = "blue_green"
-    DARK_LAUNCH = "dark_launch"
+    FULL_DEPLOYMENT = "full_deployment"
 
 
 @dataclass

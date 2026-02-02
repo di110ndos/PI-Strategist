@@ -182,24 +182,18 @@ class DeploymentAnalyzer:
 
     def _recommend_strategy(self, domain: str, tasks: list[Task]) -> DeploymentStrategy:
         """Recommend a deployment strategy based on domain and tasks."""
-        # High-risk domains should use canary
-        high_risk_domains = {"auth", "payment", "data"}
-        if domain in high_risk_domains:
-            return DeploymentStrategy.CANARY
-
-        # UI changes can use feature flags
-        if domain in {"ui", "user"}:
+        # Domains that benefit from feature flags (can be toggled on/off)
+        feature_flag_domains = {"ui", "user", "notification", "analytics", "search"}
+        if domain in feature_flag_domains:
             return DeploymentStrategy.FEATURE_FLAG
 
-        # API changes benefit from blue-green
-        if domain in {"api"}:
-            return DeploymentStrategy.BLUE_GREEN
+        # High-risk or infrastructure domains should use full deployment
+        # (auth, payment, data, api, admin need full testing before release)
+        full_deployment_domains = {"auth", "payment", "data", "api", "admin"}
+        if domain in full_deployment_domains:
+            return DeploymentStrategy.FULL_DEPLOYMENT
 
-        # Analytics/reporting can be dark launched
-        if domain in {"analytics", "notification"}:
-            return DeploymentStrategy.DARK_LAUNCH
-
-        # Default to feature flag for safety
+        # Default to feature flag for flexibility
         return DeploymentStrategy.FEATURE_FLAG
 
     def _format_cluster_name(self, domain: str) -> str:
@@ -239,9 +233,7 @@ class DeploymentAnalyzer:
         """Generate a rollback plan description for the strategy."""
         plans = {
             DeploymentStrategy.FEATURE_FLAG: "Disable feature flag to instantly revert",
-            DeploymentStrategy.CANARY: "Route 100% traffic to stable version",
-            DeploymentStrategy.BLUE_GREEN: "Switch load balancer back to blue environment",
-            DeploymentStrategy.DARK_LAUNCH: "Remove dark launch activation, no user impact",
+            DeploymentStrategy.FULL_DEPLOYMENT: "Redeploy previous version via deployment pipeline",
         }
         return plans.get(strategy, "Manual rollback via deployment pipeline")
 
