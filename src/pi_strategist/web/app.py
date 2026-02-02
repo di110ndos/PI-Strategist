@@ -79,10 +79,14 @@ with col2:
         - Compare resource allocation options
         - Simulate cost and utilization changes
 
+        **📊 Compare**
+        - Compare saved analyses
+        - Track PI-to-PI changes
+        - Monitor cost and utilization trends
+
         **⚙️ Settings**
         - Configure API keys
         - Set default analysis parameters
-        - Customize display options
         """
     )
 
@@ -116,6 +120,7 @@ with st.sidebar:
     st.page_link("pages/1_Analyze.py", label="Full Analysis", icon="📊")
     st.page_link("pages/2_Quick_Check.py", label="Quick Check", icon="⚡")
     st.page_link("pages/4_Scenarios.py", label="Scenarios", icon="🔮")
+    st.page_link("pages/5_Compare.py", label="Compare", icon="📈")
     st.page_link("pages/3_Settings.py", label="Settings", icon="⚙️")
 
 
