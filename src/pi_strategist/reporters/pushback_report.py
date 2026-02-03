@@ -101,11 +101,13 @@ class PushbackReport:
 
             for rf in flags:
                 severity_icon = self._severity_icon(rf.severity)
-                lines.append(f"{severity_icon} RED FLAG #{flag_num}")
-                lines.append(f"   AC: \"{rf.ac.text}\"")
-                lines.append(f"   Issue: {rf.category} - \"{rf.flagged_term}\"")
-                lines.append(f"   Suggested Metric: \"{rf.suggested_metric}\"")
-                lines.append(f"   Negotiation Script: \"{rf.negotiation_script}\"")
+                # Get a plain text excerpt (strip HTML tags)
+                excerpt = self._get_context_excerpt(rf.ac.text, rf.flagged_term)
+                excerpt = excerpt.replace("<mark>", ">>").replace("</mark>", "<<")
+                lines.append(f"{severity_icon} RED FLAG #{flag_num}: {rf.category}")
+                lines.append(f"   Context: {excerpt}")
+                lines.append(f"   Suggested: {rf.suggested_metric}")
+                lines.append(f"   Script: \"{rf.negotiation_script}\"")
                 lines.append("")
                 flag_num += 1
 
@@ -203,11 +205,19 @@ class PushbackReport:
         .severity-moderate {{ background: #f39c12; color: white; }}
         .severity-low {{ background: #3498db; color: white; }}
         .ac-text {{
-            background: #fff3cd;
-            padding: 10px;
+            background: #f8f9fa;
+            padding: 8px 12px;
             border-radius: 4px;
-            margin: 10px 0;
-            font-style: italic;
+            margin: 8px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+            border-left: 3px solid #ddd;
+        }}
+        .ac-text mark {{
+            background: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
         }}
         .suggestion {{
             background: #d4edda;
@@ -271,15 +281,15 @@ class PushbackReport:
 
             for rf in flags:
                 severity_class = rf.severity.value
+                excerpt = self._get_context_excerpt(rf.ac.text, rf.flagged_term)
                 html += f"""
             <div class="red-flag">
                 <div class="flag-header">
                     <span class="severity-badge severity-{severity_class}">{severity_class.upper()}</span>
                     <strong>Red Flag #{flag_num}: {rf.category}</strong>
                 </div>
-                <div class="label">Acceptance Criteria:</div>
-                <div class="ac-text">"{rf.ac.text}"</div>
-                <div class="label">Flagged Term: <code>{rf.flagged_term}</code></div>
+                <div class="label">Context:</div>
+                <div class="ac-text">{excerpt}</div>
                 <div class="label">Suggested Metric:</div>
                 <div class="suggestion">{rf.suggested_metric}</div>
                 <div class="label">Negotiation Script:</div>
@@ -367,6 +377,58 @@ class PushbackReport:
             RedFlagSeverity.LOW: "[~]",
         }
         return icons.get(severity, "[?]")
+
+    def _get_context_excerpt(self, text: str, term: str, context_chars: int = 40) -> str:
+        """Extract a focused excerpt around the flagged term.
+
+        Args:
+            text: Full acceptance criteria text
+            term: The flagged term to highlight
+            context_chars: Number of characters to show before/after the term
+
+        Returns:
+            Excerpt with the term highlighted using <mark> tags
+        """
+        import re
+
+        # Find the term (case-insensitive)
+        pattern = re.compile(re.escape(term), re.IGNORECASE)
+        match = pattern.search(text)
+
+        if not match:
+            # Term not found, return truncated text
+            if len(text) <= context_chars * 2:
+                return text
+            return text[:context_chars * 2] + "..."
+
+        start_pos = match.start()
+        end_pos = match.end()
+
+        # Calculate excerpt boundaries
+        excerpt_start = max(0, start_pos - context_chars)
+        excerpt_end = min(len(text), end_pos + context_chars)
+
+        # Build excerpt with ellipses
+        prefix = "..." if excerpt_start > 0 else ""
+        suffix = "..." if excerpt_end < len(text) else ""
+
+        # Get the excerpt and highlight the term
+        excerpt = text[excerpt_start:excerpt_end]
+
+        # Adjust term position for the excerpt
+        term_start_in_excerpt = start_pos - excerpt_start
+        term_end_in_excerpt = end_pos - excerpt_start
+
+        # Insert highlight markers
+        highlighted = (
+            excerpt[:term_start_in_excerpt]
+            + "<mark>"
+            + excerpt[term_start_in_excerpt:term_end_in_excerpt]
+            + "</mark>"
+            + excerpt[term_end_in_excerpt:]
+        )
+
+        return prefix + highlighted + suffix
 
     def save(
         self,

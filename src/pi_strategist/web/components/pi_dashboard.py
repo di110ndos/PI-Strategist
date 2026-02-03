@@ -474,31 +474,71 @@ def _render_project_summary(analysis) -> None:
         st.info("No project data available")
         return
 
-    # Project table
-    project_data = []
-    for name, project in sorted(analysis.projects.items(), key=lambda x: -x[1].total_hours):
-        sprints = [s for s, v in project.sprint_allocation.items() if v]
+    # Calculate totals for summary
+    total_project_hours = sum(p.total_hours for p in analysis.projects.values())
+    total_resources_assigned = len(set(
+        r for p in analysis.projects.values() for r in p.resource_hours.keys()
+    ))
 
-        project_data.append({
-            "Project": name[:50] + "..." if len(name) > 50 else name,
-            "Priority": project.priority or "N/A",
-            "Total Hours": f"{project.total_hours:,.1f}",
-            "Resources": len(project.resource_hours),
-            "Sprints": ", ".join(sorted(sprints)) if sprints else "Unassigned",
-        })
+    # Summary metrics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Projects", len(analysis.projects))
+    with col2:
+        st.metric("Total Hours", f"{total_project_hours:,.0f}h")
+    with col3:
+        st.metric("Resources Assigned", total_resources_assigned)
+    with col4:
+        avg_hours = total_project_hours / len(analysis.projects) if analysis.projects else 0
+        st.metric("Avg Hours/Project", f"{avg_hours:,.0f}h")
 
-    st.dataframe(project_data, width="stretch", height=400)
+    st.markdown("---")
 
-    # Top projects by hours
+    # Top projects by hours with visual bars
     st.markdown("#### Top Projects by Hours")
-    top_projects = sorted(analysis.projects.items(), key=lambda x: -x[1].total_hours)[:10]
+    top_projects = sorted(analysis.projects.items(), key=lambda x: -x[1].total_hours)[:15]
+    max_hours = top_projects[0][1].total_hours if top_projects else 1
+
     for name, project in top_projects:
         if project.total_hours > 0:
-            col1, col2 = st.columns([3, 1])
+            sprints = [s for s, v in project.sprint_allocation.items() if v]
+            resource_count = len(project.resource_hours)
+            bar_width = (project.total_hours / max_hours) * 100
+
+            col1, col2, col3 = st.columns([3, 2, 1])
             with col1:
-                st.write(f"**{name[:40]}**" + ("..." if len(name) > 40 else ""))
+                display_name = name[:45] + "..." if len(name) > 45 else name
+                st.markdown(f"**{display_name}**")
+                st.caption(f"{resource_count} resource{'s' if resource_count != 1 else ''} • {', '.join(sorted(sprints)) if sprints else 'Unassigned'}")
             with col2:
-                st.write(f"{project.total_hours:,.0f}h")
+                st.markdown(
+                    f'''<div style="background:#e9ecef;border-radius:4px;height:24px;margin-top:8px;">
+                        <div style="background:#007bff;width:{bar_width}%;height:100%;border-radius:4px;"></div>
+                    </div>''',
+                    unsafe_allow_html=True
+                )
+            with col3:
+                st.markdown(f"**{project.total_hours:,.0f}h**")
+
+    st.markdown("---")
+
+    # Full project table
+    with st.expander("View All Projects", expanded=False):
+        project_data = []
+        for name, project in sorted(analysis.projects.items(), key=lambda x: -x[1].total_hours):
+            sprints = [s for s, v in project.sprint_allocation.items() if v]
+            resources = list(project.resource_hours.keys())
+
+            project_data.append({
+                "Project": name[:50] + "..." if len(name) > 50 else name,
+                "Priority": project.priority or "-",
+                "Hours": round(project.total_hours, 1),
+                "Resources": len(resources),
+                "Resource Names": ", ".join(resources[:3]) + ("..." if len(resources) > 3 else ""),
+                "Sprints": ", ".join(sorted(sprints)) if sprints else "-",
+            })
+
+        st.dataframe(project_data, use_container_width=True, height=400)
 
 
 def _render_financial_summary(analysis, metrics: PIMetrics) -> None:
@@ -547,18 +587,30 @@ def _render_financial_summary(analysis, metrics: PIMetrics) -> None:
     st.markdown("#### Cost by Sprint")
 
     sprint_costs = {}
+    sprint_hours = {}
     for sprint_name in analysis.sprints:
         sprint_costs[sprint_name] = 0
+        sprint_hours[sprint_name] = 0
         for resource_name, resource in analysis.resources.items():
-            remaining = resource.sprint_remaining.get(sprint_name, 0)
-            # Estimate hours allocated = capacity - remaining
-            # This is approximate since we don't have exact per-sprint allocation
-            if resource.rate > 0 and remaining < 0:
-                # Over-allocated resources have negative remaining
-                sprint_costs[sprint_name] += abs(remaining) * resource.rate
+            # Use sprint_hours which contains actual allocated hours per sprint
+            hours = resource.sprint_hours.get(sprint_name, 0)
+            sprint_hours[sprint_name] += hours
+            if resource.rate > 0 and hours > 0:
+                sprint_costs[sprint_name] += hours * resource.rate
 
-    for sprint, cost in sorted(sprint_costs.items()):
-        st.write(f"- **{sprint}**: ${cost:,.0f}")
+    if any(sprint_costs.values()):
+        for sprint in sorted(sprint_costs.keys()):
+            cost = sprint_costs[sprint]
+            hours = sprint_hours[sprint]
+            col1, col2, col3 = st.columns([2, 1, 1])
+            with col1:
+                st.write(f"**{sprint}**")
+            with col2:
+                st.write(f"{hours:,.0f}h")
+            with col3:
+                st.write(f"${cost:,.0f}")
+    else:
+        st.info("Sprint-level cost data not available. Cost is calculated from total hours × rate.")
 
 
 def _render_timeline_view(analysis, plan) -> None:

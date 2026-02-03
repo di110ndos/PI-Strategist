@@ -30,55 +30,10 @@ st.markdown("Configure PI Strategist settings and preferences.")
 # Initialize session state for settings
 if "settings" not in st.session_state:
     st.session_state.settings = {
-        "api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
         "default_buffer": 20,
         "default_cd_target": 30,
     }
 
-
-st.markdown("---")
-
-# API Configuration
-st.subheader("API Configuration")
-
-st.markdown(
-    """
-    PI Strategist can use Claude AI for enhanced analysis. Configure your API key below.
-    Your API key is stored only in your session and never transmitted except to Anthropic.
-    """
-)
-
-col1, col2 = st.columns([3, 1])
-
-with col1:
-    api_key = st.text_input(
-        "Anthropic API Key",
-        value=st.session_state.settings["api_key"],
-        type="password",
-        placeholder="sk-ant-...",
-        help="Enter your Anthropic API key for AI-powered features",
-    )
-
-with col2:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if api_key:
-        # Validate API key format
-        if api_key.startswith("sk-ant-"):
-            st.success("✓ Valid format")
-        else:
-            st.warning("⚠ Check format")
-
-# Show API key status
-if api_key:
-    masked_key = api_key[:10] + "..." + api_key[-4:] if len(api_key) > 14 else "***"
-    st.caption(f"Current key: {masked_key}")
-else:
-    st.caption("No API key configured")
-
-st.info(
-    "Get your API key from [console.anthropic.com](https://console.anthropic.com/). "
-    "The API key enables AI-powered analysis features."
-)
 
 st.markdown("---")
 
@@ -125,7 +80,6 @@ col1, col2, col3 = st.columns([1, 1, 2])
 with col1:
     if st.button("💾 Save Settings", type="primary", width="stretch"):
         st.session_state.settings = {
-            "api_key": api_key,
             "default_buffer": default_buffer,
             "default_cd_target": default_cd_target,
         }
@@ -134,7 +88,6 @@ with col1:
 with col2:
     if st.button("🔄 Reset to Defaults", width="stretch"):
         st.session_state.settings = {
-            "api_key": "",
             "default_buffer": 20,
             "default_cd_target": 30,
         }
@@ -146,7 +99,6 @@ st.markdown("---")
 st.subheader("Current Configuration")
 
 config_display = {
-    "API Key": "Configured" if st.session_state.settings["api_key"] else "Not configured",
     "Default Buffer": f"{st.session_state.settings['default_buffer']}%",
     "Default CD Target": f"{st.session_state.settings['default_cd_target']}%",
 }
@@ -154,11 +106,7 @@ config_display = {
 col1, col2 = st.columns(2)
 
 with col1:
-    for key, value in list(config_display.items())[:2]:
-        st.markdown(f"**{key}:** {value}")
-
-with col2:
-    for key, value in list(config_display.items())[2:]:
+    for key, value in config_display.items():
         st.markdown(f"**{key}:** {value}")
 
 st.markdown("---")
@@ -199,10 +147,6 @@ with col2:
 
         *Capacity Planners:*
         - Microsoft Excel (.xlsx)
-
-        **Links:**
-        - [Documentation](https://github.com/yourusername/pi-strategist)
-        - [Report Issues](https://github.com/yourusername/pi-strategist/issues)
         """
     )
 
@@ -226,7 +170,6 @@ with st.expander("Environment Information"):
         ("python-docx", "docx"),
         ("openpyxl", "openpyxl"),
         ("pdfplumber", "pdfplumber"),
-        ("anthropic", "anthropic"),
     ]
 
     for name, module in dependencies:
@@ -240,7 +183,6 @@ with st.expander("Environment Information"):
 with st.sidebar:
     st.markdown("### Quick Links")
     st.page_link("app.py", label="Home", icon="🏠")
-    st.page_link("pages/1_Analyze.py", label="Full Analysis", icon="📊")
     st.page_link("pages/2_Quick_Check.py", label="Quick Check", icon="⚡")
 
     st.markdown("---")
