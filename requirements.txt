@@ -1,13 +1,14 @@
 # PI Strategist dependencies
 # Generated from pyproject.toml for Streamlit Cloud deployment
+# SECURITY: Versions pinned for supply chain security (Tier 1 compliance)
 
-click>=8.1.0
-python-docx>=1.1.0
-openpyxl>=3.1.0
-pdfplumber>=0.11.0
-jinja2>=3.1.0
-anthropic>=0.40.0
-pydantic>=2.0.0
-rich>=13.0.0
-streamlit>=1.30.0
-fpdf2>=2.7.0
+click==8.1.7
+python-docx==1.1.2
+openpyxl==3.1.5
+pdfplumber==0.11.4
+jinja2==3.1.4
+anthropic==0.40.0
+pydantic==2.10.3
+rich==13.9.4
+streamlit==1.41.1
+fpdf2==2.8.2

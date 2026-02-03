@@ -899,7 +899,9 @@ if st.session_state.analysis_results:
                     st.json(json_report)
 
     # Debug log section at the bottom (collapsible)
-    if results.get("debug_log"):
+    # Only shown when DEBUG=true environment variable is set (security compliance)
+    import os
+    if results.get("debug_log") and os.environ.get("DEBUG", "").lower() == "true":
         st.markdown("---")
         with st.expander("🔧 Debug Log", expanded=False):
             st.caption("Technical details for troubleshooting")

@@ -37,6 +37,14 @@ class PDFReport(FPDF if HAS_FPDF else object):
 
     def header(self):
         """Page header."""
+        # Classification banner
+        self.set_fill_color(192, 57, 43)  # Red background
+        self.set_text_color(255, 255, 255)  # White text
+        self.set_font("Helvetica", "B", 10)
+        self.cell(0, 8, "INTERNAL - DO NOT DISTRIBUTE", ln=True, align="C", fill=True)
+        self.ln(3)
+
+        # Report title
         self.set_font("Helvetica", "B", 12)
         self.set_text_color(60, 60, 60)
         self.cell(0, 10, self.config.title, ln=True, align="L")
@@ -51,10 +59,15 @@ class PDFReport(FPDF if HAS_FPDF else object):
 
     def footer(self):
         """Page footer."""
-        self.set_y(-15)
+        self.set_y(-20)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(120, 120, 120)
-        self.cell(0, 10, f"Page {self.page_no()}/{{nb}} | {self.config.author}", align="C")
+        self.cell(0, 5, f"Page {self.page_no()}/{{nb}} | {self.config.author}", ln=True, align="C")
+        # Classification footer
+        self.set_fill_color(192, 57, 43)  # Red background
+        self.set_text_color(255, 255, 255)  # White text
+        self.set_font("Helvetica", "B", 8)
+        self.cell(0, 6, "INTERNAL - DO NOT DISTRIBUTE", align="C", fill=True)
 
 
 class ExecutiveReportGenerator:

@@ -65,6 +65,12 @@ class PushbackReport:
         """Generate text format report."""
         lines = []
 
+        # Classification header
+        lines.append("=" * 70)
+        lines.append("INTERNAL - DO NOT DISTRIBUTE")
+        lines.append("=" * 70)
+        lines.append("")
+
         # Header
         lines.append("=" * 70)
         lines.append("PUSHBACK REPORT - DED Analysis")
@@ -114,6 +120,11 @@ class PushbackReport:
             lines.append("-" * 70)
             lines.append("")
 
+        # Classification footer
+        lines.append("=" * 70)
+        lines.append("INTERNAL - DO NOT DISTRIBUTE")
+        lines.append("=" * 70)
+
         return "\n".join(lines)
 
     def _generate_html(
@@ -139,6 +150,16 @@ class PushbackReport:
             margin: 0 auto;
             padding: 20px;
             background: #f5f5f5;
+        }}
+        .classification-banner {{
+            background: #c0392b;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 20px;
+            border-radius: 4px;
         }}
         .report {{
             background: white;
@@ -239,6 +260,7 @@ class PushbackReport:
     </style>
 </head>
 <body>
+    <div class="classification-banner">INTERNAL - DO NOT DISTRIBUTE</div>
     <div class="report">
         <h1>Pushback Report - DED Analysis</h1>
 """
@@ -304,6 +326,7 @@ class PushbackReport:
 
         html += """
     </div>
+    <div class="classification-banner">INTERNAL - DO NOT DISTRIBUTE</div>
 </body>
 </html>
 """
@@ -316,6 +339,7 @@ class PushbackReport:
     ) -> str:
         """Generate JSON format report."""
         data = {
+            "classification": "INTERNAL - DO NOT DISTRIBUTE",
             "report_type": "pushback_report",
             "summary": self._calculate_summary(red_flags),
             "document": {

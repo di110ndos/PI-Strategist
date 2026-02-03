@@ -2,6 +2,35 @@
 
 A dual-mode system for Program Increment (PI) planning analysis: a Claude Code custom agent for interactive analysis and a standalone CLI application for batch processing.
 
+## Security Notice
+
+**IMPORTANT: This tool is intended for INTERNAL use only with non-sensitive planning data.**
+
+### Data Classification
+
+- **Allowed:** DED documents, capacity planners, sprint allocations, resource names, project names, hours, and rates
+- **NOT Allowed:**
+  - Customer PII or regulated data (HIPAA, PCI, etc.)
+  - Secrets, credentials, API keys, or connection strings
+  - Confidential business data beyond planning scope
+
+### AI Processing Warning
+
+When AI features are enabled, planning data (resource names, hours, allocations, project details) is sent to Anthropic's Claude API for analysis. Ensure this complies with your organization's data handling policies before use.
+
+### Data Cleanup
+
+After completing your planning session:
+1. Delete any saved analyses in the `saved_analyses/` directory
+2. Clear downloaded reports from your local machine
+3. Do not store exports containing planning data in shared locations without proper access controls
+
+### Shared Environment Warning
+
+When running on shared servers, note that:
+- The `saved_analyses/` directory is accessible to all sessions on the same server
+- Saved analyses may contain resource names, hours, rates, and allocation data
+
 ## Features
 
 - **Red Flag Detection**: Identifies ambiguous, subjective, or unmeasurable acceptance criteria in DEDs
