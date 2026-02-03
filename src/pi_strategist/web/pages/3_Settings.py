@@ -78,7 +78,7 @@ st.markdown("---")
 col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
-    if st.button("💾 Save Settings", type="primary", width="stretch"):
+    if st.button("💾 Save Settings", type="primary", use_container_width=True):
         st.session_state.settings = {
             "default_buffer": default_buffer,
             "default_cd_target": default_cd_target,
@@ -86,7 +86,7 @@ with col1:
         st.success("Settings saved successfully!")
 
 with col2:
-    if st.button("🔄 Reset to Defaults", width="stretch"):
+    if st.button("🔄 Reset to Defaults", use_container_width=True):
         st.session_state.settings = {
             "default_buffer": 20,
             "default_cd_target": 30,

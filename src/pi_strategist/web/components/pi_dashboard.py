@@ -444,7 +444,7 @@ def _render_sprint_capacity(analysis, plan) -> None:
 
     # Detailed table
     st.markdown("#### Sprint Details")
-    st.dataframe(sprint_data, width="stretch")
+    st.dataframe(sprint_data, use_container_width=True)
 
     # Sprint burndown visualization (simple bar chart)
     st.markdown("#### Capacity vs Load")
@@ -664,7 +664,7 @@ def _render_risks_warnings(analysis) -> None:
                 "Impact": "High" if hours > 20 else "Medium" if hours > 10 else "Low"
             })
 
-        st.dataframe(overalloc_data, width="stretch")
+        st.dataframe(overalloc_data, use_container_width=True)
 
         # Summary by resource
         resource_overalloc = {}

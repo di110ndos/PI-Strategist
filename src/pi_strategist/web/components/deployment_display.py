@@ -215,7 +215,7 @@ def _render_cluster_card(cluster: DeploymentCluster) -> None:
             for task in cluster.tasks
         ]
 
-        st.dataframe(task_data, width="stretch")
+        st.dataframe(task_data, use_container_width=True)
 
 
 def render_deployment_table(clusters: list[DeploymentCluster]) -> None:
@@ -237,7 +237,7 @@ def render_deployment_table(clusters: list[DeploymentCluster]) -> None:
             }
         )
 
-    st.dataframe(data, width="stretch")
+    st.dataframe(data, use_container_width=True)
 
 
 def render_strategy_legend() -> None:

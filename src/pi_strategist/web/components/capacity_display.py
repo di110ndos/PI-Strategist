@@ -269,4 +269,4 @@ def render_capacity_table(analyses: list[SprintAnalysis]) -> None:
             }
         )
 
-    st.dataframe(data, width="stretch")
+    st.dataframe(data, use_container_width=True)

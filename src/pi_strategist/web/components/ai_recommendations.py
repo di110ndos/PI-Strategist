@@ -67,19 +67,19 @@ def render_ai_recommendations(
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("🔍 Run Full Analysis", type="primary", width="stretch"):
+        if st.button("🔍 Run Full Analysis", type="primary", use_container_width=True):
             with st.spinner("AI is analyzing your PI data..."):
                 result = advisor.analyze_pi_planning(pi_analysis, capacity_plan, red_flags)
                 st.session_state.ai_analysis_result = result
 
     with col2:
-        if st.button("📝 Generate Summary", width="stretch"):
+        if st.button("📝 Generate Summary", use_container_width=True):
             with st.spinner("Generating executive summary..."):
                 summary = advisor.generate_executive_summary(pi_analysis, capacity_plan)
                 st.session_state.ai_summary = summary
 
     with col3:
-        if st.button("⚖️ Suggest Rebalancing", width="stretch"):
+        if st.button("⚖️ Suggest Rebalancing", use_container_width=True):
             with st.spinner("Analyzing capacity..."):
                 suggestions = advisor.suggest_rebalancing(pi_analysis, capacity_plan)
                 st.session_state.ai_rebalancing = suggestions

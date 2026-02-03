@@ -766,7 +766,7 @@ def _render_scenario_comparison(scenarios: list[Scenario], base_analysis: PIAnal
             "Status": status
         })
 
-    st.dataframe(comparison_data, width="stretch", hide_index=True)
+    st.dataframe(comparison_data, use_container_width=True, hide_index=True)
 
     # Visual bars
     st.markdown("#### Utilization Comparison")
