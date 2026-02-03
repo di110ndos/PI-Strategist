@@ -294,7 +294,7 @@ analyze_button = st.button(
     "🔍 Analyze",
     type="primary",
     disabled=(not has_ded and not has_excel),
-    width="stretch",
+    use_container_width=True,
 )
 
 if not has_ded and not has_excel:
@@ -818,7 +818,7 @@ if st.session_state.analysis_results:
                                 data=pdf_bytes,
                                 file_name="pi_executive_report.pdf",
                                 mime="application/pdf",
-                                width="stretch",
+                                use_container_width=True,
                             )
                             st.success("PDF generated successfully!")
 
@@ -848,7 +848,7 @@ if st.session_state.analysis_results:
                         data=html_report,
                         file_name="pushback_report.html",
                         mime="text/html",
-                        width="stretch",
+                        use_container_width=True,
                     )
 
                 with col2:
@@ -863,7 +863,7 @@ if st.session_state.analysis_results:
                         data=json_report,
                         file_name="pushback_report.json",
                         mime="application/json",
-                        width="stretch",
+                        use_container_width=True,
                     )
 
                 with col3:
@@ -878,7 +878,7 @@ if st.session_state.analysis_results:
                         data=text_report,
                         file_name="pushback_report.txt",
                         mime="text/plain",
-                        width="stretch",
+                        use_container_width=True,
                     )
 
                 # Preview
