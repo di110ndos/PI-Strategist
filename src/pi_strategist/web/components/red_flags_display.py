@@ -270,8 +270,8 @@ def _render_compact_flag_card(rf: RedFlag, show_severity: bool = True, enable_ig
             st.markdown("**Replace with:**")
             st.code(rf.suggested_metric, language=None)
 
-        # Negotiation script (collapsible)
-        with st.expander("💬 How to discuss this", expanded=False):
+        # Negotiation script (popover avoids nested-expander error)
+        with st.popover("💬 How to discuss this"):
             st.info(rf.negotiation_script)
 
         st.divider()
