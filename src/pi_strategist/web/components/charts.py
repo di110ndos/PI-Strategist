@@ -232,11 +232,20 @@ def render_risk_by_category_chart(red_flags: list[RedFlag]) -> None:
 def render_resource_heatmap(analysis) -> None:
     """Heatmap of resource allocation across sprints.
 
+    Shows hours per resource per sprint. Color indicates allocation level:
+    - Gray: No allocation
+    - Blue: Low allocation (may have capacity)
+    - Green: Optimal allocation
+    - Amber/Red: High allocation (potential overload)
+
     Args:
         analysis: PIAnalysis object with resources and sprints.
     """
     if not analysis.resources or not analysis.sprints:
         return
+
+    # Target hours per sprint (488h per PI / 4 sprints = ~122h per sprint)
+    TARGET_HOURS_PER_SPRINT = 122.0
 
     sprint_names = sorted(analysis.sprints)
     resource_names = sorted(analysis.resources.keys(),
@@ -250,8 +259,11 @@ def render_resource_heatmap(analysis) -> None:
         hover_row = []
         for sprint in sprint_names:
             hours = resource.sprint_hours.get(sprint, 0)
-            row.append(hours)
-            hover_row.append(f"{rname}<br>{sprint}: {hours:.0f}h")
+            # Normalize to percentage of target (100% = optimal)
+            pct = (hours / TARGET_HOURS_PER_SPRINT) * 100 if TARGET_HOURS_PER_SPRINT > 0 else 0
+            row.append(pct)
+            status = "Under" if pct < 80 else "OK" if pct <= 105 else "Over"
+            hover_row.append(f"{rname}<br>{sprint}: {hours:.0f}h ({pct:.0f}%)<br>Status: {status}")
         z_data.append(row)
         hover_text.append(hover_row)
 
@@ -261,18 +273,22 @@ def render_resource_heatmap(analysis) -> None:
         y=resource_names,
         hovertext=hover_text,
         hovertemplate="%{hovertext}<extra></extra>",
+        zmin=0,
+        zmax=150,  # Cap at 150% for color scaling
         colorscale=[
-            [0.0, "#1a1a2e"],
-            [0.2, "#16213e"],
-            [0.4, BLUE],
-            [0.6, CYAN],
-            [0.8, "#4ade80"],
-            [1.0, GREEN],
+            [0.0, "#1e1e2e"],      # 0% - dark (no allocation)
+            [0.25, BLUE],          # ~38% - blue (low)
+            [0.53, GREEN],         # ~80% - green (start of optimal)
+            [0.70, GREEN],         # ~105% - green (end of optimal)
+            [0.85, AMBER],         # ~128% - amber (getting high)
+            [1.0, RED],            # 150%+ - red (over-allocated)
         ],
         colorbar=dict(
-            title="Hours",
+            title="% of Target",
             titlefont=dict(color=TEXT_MUTED),
             tickfont=dict(color=TEXT_DIM),
+            tickvals=[0, 50, 80, 100, 120, 150],
+            ticktext=["0%", "50%", "80%", "100%", "120%", "150%+"],
         ),
     ))
 
