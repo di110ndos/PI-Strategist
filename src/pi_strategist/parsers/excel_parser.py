@@ -1,11 +1,14 @@
 """Parser for Excel capacity planners."""
 
+import logging
 import re
 from pathlib import Path
 from typing import Optional
 
 from pi_strategist.models import CapacityPlan, Sprint, Task
 from pi_strategist.parsers.pi_planner_parser import PIPlannerParser
+
+logger = logging.getLogger(__name__)
 
 
 class ExcelParser:
@@ -71,8 +74,8 @@ class ExcelParser:
                 plan = pi_parser.parse(path)
                 if plan.sprints:
                     return plan
-            except Exception:
-                pass  # Fall back to standard parsing
+            except Exception as exc:
+                logger.warning("PI planner parse failed, falling back to standard parsing: %s", exc)
 
         plan = CapacityPlan(filename=path.name)
 
@@ -186,8 +189,8 @@ class ExcelParser:
                                     hours = float(hours_cell)
                                     if hours > 0:
                                         capacity[sprint_name] = hours
-                                except (ValueError, TypeError):
-                                    pass
+                                except (ValueError, TypeError) as exc:
+                                    logger.warning("Non-numeric capacity value in %s: %s", sprint_name, exc)
                         if capacity:
                             return capacity
 
@@ -270,8 +273,8 @@ class ExcelParser:
                             try:
                                 hours = float(hours_cell)
                                 result[sprint_name][resource_name] = hours
-                            except (ValueError, TypeError):
-                                pass
+                            except (ValueError, TypeError) as exc:
+                                logger.warning("Non-numeric hours for %s in %s: %s", resource_name, sprint_name, exc)
 
                 if any(result[s] for s in sprint_names):
                     break
@@ -357,8 +360,8 @@ class ExcelParser:
                         hours = float(hours_cell)
                         if hours > 0:
                             project_hours[project] += hours
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric hours for project %s: %s", project, exc)
 
         # Create tasks from projects with hours
         tasks = []
@@ -584,7 +587,8 @@ class ExcelParser:
                                 adjacent = sheet.cell(row=cell.row, column=cell.column + offset)
                                 if adjacent.value and isinstance(adjacent.value, (int, float)):
                                     return float(adjacent.value)
-                            except (ValueError, IndexError):
+                            except (ValueError, IndexError) as exc:
+                                logger.debug("Could not read adjacent cell at offset %d: %s", offset, exc)
                                 continue
 
         return 0.0

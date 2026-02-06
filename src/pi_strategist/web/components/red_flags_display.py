@@ -4,35 +4,12 @@ import streamlit as st
 from typing import Optional
 
 from pi_strategist.models import RedFlag, RedFlagSeverity, DEDDocument
-
-
-# Severity configuration
-SEVERITY_CONFIG = {
-    RedFlagSeverity.CRITICAL: {
-        "color": "#dc3545",
-        "bg_color": "#f8d7da",
-        "border_color": "#f5c6cb",
-        "icon": "🚨",
-        "label": "Critical",
-        "description": "Blocks acceptance - resolve before development",
-    },
-    RedFlagSeverity.MODERATE: {
-        "color": "#fd7e14",
-        "bg_color": "#fff3cd",
-        "border_color": "#ffeeba",
-        "icon": "⚠️",
-        "label": "Moderate",
-        "description": "Needs clarification before sprint planning",
-    },
-    RedFlagSeverity.LOW: {
-        "color": "#0d6efd",
-        "bg_color": "#cfe2ff",
-        "border_color": "#b6d4fe",
-        "icon": "💡",
-        "label": "Low",
-        "description": "Nice to clarify during development",
-    },
-}
+from pi_strategist.web.theme import SEVERITY_CONFIG
+from pi_strategist.web.components.charts import (
+    render_risk_distribution_chart,
+    render_risk_by_category_chart,
+)
+from pi_strategist.reporters.csv_export import red_flags_to_csv, render_csv_download
 
 
 def render_red_flags(
@@ -58,6 +35,17 @@ def render_red_flags(
 
     st.markdown("---")
 
+    # Charts
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        st.markdown("#### Severity Distribution")
+        render_risk_distribution_chart(red_flags)
+    with chart_col2:
+        st.markdown("#### By Category")
+        render_risk_by_category_chart(red_flags)
+
+    st.markdown("---")
+
     # View toggle
     view_mode = st.radio(
         "View",
@@ -78,6 +66,10 @@ def render_red_flags(
         _render_flat_list(filtered_flags, enable_ignore=enable_ignore)
     else:
         render_red_flags_table(filtered_flags)
+
+    # CSV export
+    st.markdown("---")
+    render_csv_download(red_flags_to_csv(red_flags), "red_flags.csv", "Download Red Flags CSV")
 
 
 def _render_executive_summary(red_flags: list[RedFlag]) -> None:
@@ -110,13 +102,13 @@ def _render_executive_summary(red_flags: list[RedFlag]) -> None:
         st.metric("Total Issues", len(red_flags))
 
     with cols[1]:
-        _render_severity_metric("🚨 Critical", len(critical), "#dc3545")
+        _render_severity_metric("🚨 Critical", len(critical), SEVERITY_CONFIG[RedFlagSeverity.CRITICAL]["color"])
 
     with cols[2]:
-        _render_severity_metric("⚠️ Moderate", len(moderate), "#fd7e14")
+        _render_severity_metric("⚠️ Moderate", len(moderate), SEVERITY_CONFIG[RedFlagSeverity.MODERATE]["color"])
 
     with cols[3]:
-        _render_severity_metric("💡 Low", len(low), "#0d6efd")
+        _render_severity_metric("💡 Low", len(low), SEVERITY_CONFIG[RedFlagSeverity.LOW]["color"])
 
 
 def _render_severity_metric(label: str, count: int, color: str) -> None:

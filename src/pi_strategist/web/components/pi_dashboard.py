@@ -4,14 +4,17 @@ import streamlit as st
 from typing import Optional
 from dataclasses import dataclass
 
-# Try to import plotly for advanced charts
-try:
-    import plotly.express as px
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    HAS_PLOTLY = True
-except ImportError:
-    HAS_PLOTLY = False
+from pi_strategist.web.theme import (
+    COLORS, BORDER, BORDER_LIGHT, CYAN, BLUE, RED, AMBER, GREEN,
+    TEXT_MUTED, BG_SURFACE_2,
+)
+from pi_strategist.web.components.charts import (
+    render_resource_heatmap,
+    render_allocation_distribution_chart,
+    render_cost_by_discipline_chart,
+    render_sprint_cost_chart,
+)
+from pi_strategist.reporters.csv_export import resources_to_csv, render_csv_download
 
 
 # Standard PI capacity per resource (4 sprints × 2 weeks × ~61 hours/week)
@@ -235,9 +238,9 @@ def _render_resource_summary(analysis) -> None:
 
         st.markdown(
             f'''<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin:15px 0;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-                <div style="background:#28a745;width:{ok_pct}%;" title="Optimal (80-105%): {optimal_count} resources"></div>
-                <div style="background:#f39c12;width:{under_pct}%;" title="Under-allocated (<80%): {under_count} resources"></div>
-                <div style="background:#dc3545;width:{over_pct}%;" title="Over-allocated (>105%): {over_count} resources"></div>
+                <div style="background:{GREEN};width:{ok_pct}%;" title="Optimal (80-105%): {optimal_count} resources"></div>
+                <div style="background:{AMBER};width:{under_pct}%;" title="Under-allocated (<80%): {under_count} resources"></div>
+                <div style="background:{RED};width:{over_pct}%;" title="Over-allocated (>105%): {over_count} resources"></div>
             </div>
             <div style="display:flex;justify-content:center;gap:25px;font-size:0.85em;margin-bottom:15px;">
                 <span title="Team members allocated between 80-105% of 488 hours">🟢 Optimal: {optimal_count}</span>
@@ -259,6 +262,17 @@ def _render_resource_summary(analysis) -> None:
             - Standard PI length: 4 sprints × 2 weeks = 8 weeks
             - Working hours: 8 weeks × 5 days × ~12.2 hours = 488 hours (accounting for meetings, etc.)
             """)
+
+    st.markdown("---")
+
+    # Charts
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        st.markdown("#### Allocation Distribution")
+        render_allocation_distribution_chart(analysis)
+    with chart_col2:
+        st.markdown("#### Resource Heatmap (Hours per Sprint)")
+        render_resource_heatmap(analysis)
 
     st.markdown("---")
 
@@ -309,6 +323,9 @@ def _render_resource_summary(analysis) -> None:
     with st.expander("View Full Data Table", expanded=False):
         _render_resource_table(analysis.resources, PI_MAX_HOURS)
 
+    # CSV export
+    render_csv_download(resources_to_csv(analysis.resources, PI_MAX_HOURS), "resources.csv", "Download Resources CSV")
+
 
 def _render_resource_row(name: str, resource, max_hours: float) -> None:
     """Render a single resource row with progress bar."""
@@ -317,20 +334,20 @@ def _render_resource_row(name: str, resource, max_hours: float) -> None:
 
     # Determine color and status
     if alloc_pct > 105:
-        color = "#dc3545"
-        bg_color = "#f8d7da"
+        color = "{RED}"
+        bg_color = "rgba(239,68,68,0.12)"
         status = "OVER"
     elif alloc_pct < 80 and total_hours > 0:
-        color = "#856404"
-        bg_color = "#fff3cd"
+        color = "{AMBER}"
+        bg_color = "rgba(245,158,11,0.12)"
         status = "UNDER"
     elif total_hours > 0:
-        color = "#155724"
-        bg_color = "#d4edda"
+        color = "{GREEN}"
+        bg_color = "rgba(34,197,94,0.12)"
         status = "OK"
     else:
-        color = "#6c757d"
-        bg_color = "#e9ecef"
+        color = "{TEXT_MUTED}"
+        bg_color = "{BG_SURFACE_2}"
         status = "-"
 
     rate = resource.rate
@@ -345,10 +362,10 @@ def _render_resource_row(name: str, resource, max_hours: float) -> None:
     with cols[1]:
         # Progress bar with percentage overlay
         st.markdown(
-            f'''<div style="position:relative;background:#e9ecef;border-radius:6px;height:28px;overflow:hidden;">
+            f'''<div style="position:relative;background:{BG_SURFACE_2};border-radius:6px;height:28px;overflow:hidden;">
                 <div style="background:{color};width:{bar_width}%;height:100%;opacity:0.7;"></div>
                 <div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:0.85em;">
-                    <span style="color:#333;font-weight:500;">{total_hours:.0f}h / {max_hours:.0f}h</span>
+                    <span style="color:{TEXT_MUTED};font-weight:500;">{total_hours:.0f}h / {max_hours:.0f}h</span>
                     <span style="color:{color};font-weight:bold;">{alloc_pct:.0f}%</span>
                 </div>
             </div>''',
@@ -427,7 +444,7 @@ def _render_sprint_capacity(analysis, plan) -> None:
     cols = st.columns(len(sprint_data))
     for i, data in enumerate(sprint_data):
         with cols[i]:
-            status_color = "#28a745" if data["Status"] == "PASS" else "#dc3545"
+            status_color = "{GREEN}" if data["Status"] == "PASS" else "{RED}"
             st.markdown(
                 f"""
                 <div style="border: 2px solid {status_color}; border-radius: 10px; padding: 15px; text-align: center;">
@@ -454,10 +471,10 @@ def _render_sprint_capacity(analysis, plan) -> None:
             st.write(f"**{data['Sprint']}**")
         with col2:
             progress = min(data["Utilization"] / 100, 1.0)
-            color = "#28a745" if data["Utilization"] <= 80 else "#f39c12" if data["Utilization"] <= 100 else "#dc3545"
+            color = "{GREEN}" if data["Utilization"] <= 80 else "{AMBER}" if data["Utilization"] <= 100 else "{RED}"
             st.markdown(
                 f"""
-                <div style="background: #e0e0e0; border-radius: 10px; height: 25px; position: relative;">
+                <div style="background: {BORDER}; border-radius: 10px; height: 25px; position: relative;">
                     <div style="background: {color}; width: {min(progress * 100, 100)}%; height: 100%; border-radius: 10px;"></div>
                     <span style="position: absolute; right: 10px; top: 3px; font-size: 12px;">{data["Utilization"]:.0f}%</span>
                 </div>
@@ -512,8 +529,8 @@ def _render_project_summary(analysis) -> None:
                 st.caption(f"{resource_count} resource{'s' if resource_count != 1 else ''} • {', '.join(sorted(sprints)) if sprints else 'Unassigned'}")
             with col2:
                 st.markdown(
-                    f'''<div style="background:#e9ecef;border-radius:4px;height:24px;margin-top:8px;">
-                        <div style="background:#007bff;width:{bar_width}%;height:100%;border-radius:4px;"></div>
+                    f'''<div style="background:{BG_SURFACE_2};border-radius:4px;height:24px;margin-top:8px;">
+                        <div style="background:{BLUE};width:{bar_width}%;height:100%;border-radius:4px;"></div>
                     </div>''',
                     unsafe_allow_html=True
                 )
@@ -558,6 +575,17 @@ def _render_financial_summary(analysis, metrics: PIMetrics) -> None:
     with col3:
         cost_per_sprint = metrics.total_cost / metrics.num_sprints if metrics.num_sprints > 0 else 0
         st.metric("Avg Cost/Sprint", f"${cost_per_sprint:,.0f}")
+
+    st.markdown("---")
+
+    # Charts
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        st.markdown("#### Cost by Discipline")
+        render_cost_by_discipline_chart(analysis)
+    with chart_col2:
+        st.markdown("#### Cost by Sprint")
+        render_sprint_cost_chart(analysis)
 
     st.markdown("---")
 
