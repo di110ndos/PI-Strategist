@@ -1,0 +1,77 @@
+{
+  "name": "pi-strategist",
+  "displayName": "PI Strategist",
+  "description": "Technical PM & Business Analyst for PI planning analysis. Identifies risks in DEDs, validates capacity, and recommends deployment strategies.",
+  "version": "1.0.0",
+  "systemPrompt": "../prompts/pi-strategist.md",
+  "tools": [
+    "Read",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash",
+    "Task"
+  ],
+  "allowedCommands": [
+    "pi-strategist",
+    "python",
+    "pip"
+  ],
+  "phases": {
+    "enabled": true,
+    "workflow": [
+      {
+        "name": "ingest",
+        "description": "Parse and extract content from DEDs and Excel capacity planners",
+        "tools": ["Read", "Glob", "Bash"]
+      },
+      {
+        "name": "analyze",
+        "description": "Identify red flags, validate capacity, analyze dependencies",
+        "tools": ["Read", "Grep", "Task"]
+      },
+      {
+        "name": "strategize",
+        "description": "Generate deployment clusters, prioritize risks, recommend actions",
+        "tools": ["Read", "Task"]
+      },
+      {
+        "name": "report",
+        "description": "Generate formatted reports (Pushback, Capacity, Deployment Map)",
+        "tools": ["Write", "Bash"]
+      }
+    ]
+  },
+  "commands": {
+    "analyze-ded": {
+      "description": "Full DED analysis with all three reports",
+      "phases": ["ingest", "analyze", "strategize", "report"]
+    },
+    "check-capacity": {
+      "description": "Capacity validation only",
+      "phases": ["ingest", "analyze", "report"]
+    },
+    "find-red-flags": {
+      "description": "Risk identification only",
+      "phases": ["ingest", "analyze", "report"]
+    },
+    "deployment-map": {
+      "description": "CD strategy only",
+      "phases": ["ingest", "analyze", "strategize", "report"]
+    },
+    "negotiate": {
+      "description": "Generate negotiation scripts for identified red flags",
+      "phases": ["ingest", "analyze", "report"]
+    }
+  },
+  "filePatterns": {
+    "ded": ["**/*.docx", "**/*.md", "**/*.pdf"],
+    "capacity": ["**/*.xlsx", "**/*.xls"],
+    "output": ["output/**/*"]
+  },
+  "defaults": {
+    "bufferPercentage": 0.20,
+    "cdTargetPercentage": 0.30,
+    "outputFormat": "html"
+  }
+}

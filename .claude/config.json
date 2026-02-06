@@ -1,0 +1,52 @@
+{
+  "projectName": "PI Strategist",
+  "version": "1.0.0",
+  "description": "PI planning analysis tool for DEDs and capacity planning",
+  "agents": {
+    "pi-strategist": {
+      "path": "./agents/pi-strategist.json",
+      "enabled": true,
+      "default": true
+    }
+  },
+  "commands": {
+    "analyze-ded": {
+      "agent": "pi-strategist",
+      "description": "Analyze DED documents for risks, capacity, and deployment strategy"
+    },
+    "check-capacity": {
+      "agent": "pi-strategist",
+      "description": "Validate sprint capacity against team availability"
+    },
+    "find-red-flags": {
+      "agent": "pi-strategist",
+      "description": "Identify ambiguous or unmeasurable acceptance criteria"
+    },
+    "deployment-map": {
+      "agent": "pi-strategist",
+      "description": "Generate continuous delivery deployment strategy"
+    },
+    "negotiate": {
+      "agent": "pi-strategist",
+      "description": "Generate negotiation scripts for stakeholder discussions"
+    }
+  },
+  "directories": {
+    "documents": "./documents",
+    "templates": "./templates",
+    "examples": "./examples",
+    "output": "./output"
+  },
+  "settings": {
+    "defaultBufferPercentage": 20,
+    "cdTargetPercentage": 30,
+    "outputFormats": ["html", "pdf", "json"],
+    "defaultOutputFormat": "html"
+  },
+  "integrations": {
+    "cli": {
+      "command": "pi-strategist",
+      "enabled": true
+    }
+  }
+}

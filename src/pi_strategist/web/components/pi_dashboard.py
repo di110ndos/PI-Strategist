@@ -9,7 +9,6 @@ from pi_strategist.web.theme import (
     TEXT_MUTED, BG_SURFACE_2,
 )
 from pi_strategist.web.components.charts import (
-    render_resource_heatmap,
     render_allocation_distribution_chart,
     render_cost_by_discipline_chart,
     render_sprint_cost_chart,
@@ -266,13 +265,8 @@ def _render_resource_summary(analysis) -> None:
     st.markdown("---")
 
     # Charts
-    chart_col1, chart_col2 = st.columns(2)
-    with chart_col1:
-        st.markdown("#### Allocation Distribution")
-        render_allocation_distribution_chart(analysis)
-    with chart_col2:
-        st.markdown("#### Resource Heatmap (Hours per Sprint)")
-        render_resource_heatmap(analysis)
+    st.markdown("#### Allocation Distribution")
+    render_allocation_distribution_chart(analysis)
 
     st.markdown("---")
 
