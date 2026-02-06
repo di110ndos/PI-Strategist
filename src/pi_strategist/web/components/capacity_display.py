@@ -5,14 +5,12 @@ from typing import Optional
 
 from pi_strategist.models import SprintStatus
 from pi_strategist.analyzers.capacity_analyzer import SprintAnalysis, CapacityRecommendation
-
-
-# Color scheme
-COLORS = {
-    "pass": "#28a745",
-    "fail": "#dc3545",
-    "warning": "#f39c12",
-}
+from pi_strategist.web.theme import COLORS, PRIORITY_COLORS, BORDER
+from pi_strategist.web.components.charts import (
+    render_capacity_burndown_chart,
+    render_utilization_trend_chart,
+)
+from pi_strategist.reporters.csv_export import capacity_to_csv, render_csv_download
 
 
 def render_capacity_analysis(
@@ -34,6 +32,17 @@ def render_capacity_analysis(
 
     st.markdown("---")
 
+    # Charts
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        st.markdown("#### Capacity vs Load")
+        render_capacity_burndown_chart(analyses)
+    with chart_col2:
+        st.markdown("#### Utilization Trend")
+        render_utilization_trend_chart(analyses)
+
+    st.markdown("---")
+
     # Sprint cards
     st.subheader("Sprint Details")
     _render_sprint_cards(analyses)
@@ -47,6 +56,10 @@ def render_capacity_analysis(
         st.markdown("---")
         st.subheader("Recommendations")
         _render_recommendations(all_recommendations)
+
+    # CSV export
+    st.markdown("---")
+    render_csv_download(capacity_to_csv(analyses), "capacity_analysis.csv", "Download Capacity CSV")
 
 
 def _render_summary_metrics(
@@ -170,7 +183,7 @@ def _render_sprint_card(analysis: SprintAnalysis) -> None:
 
         st.markdown(
             f"""
-            <div style="background-color: #e0e0e0; border-radius: 10px; height: 20px; margin: 10px 0;">
+            <div style="background-color: {BORDER}; border-radius: 10px; height: 20px; margin: 10px 0;">
                 <div style="background-color: {progress_color}; width: {min(utilization, 100)}%;
                      height: 100%; border-radius: 10px;"></div>
             </div>
@@ -222,11 +235,10 @@ def _render_recommendations(recommendations: list[CapacityRecommendation]) -> No
     sorted_recs = sorted(recommendations, key=lambda r: r.priority)
 
     priority_labels = {1: "High", 2: "Medium", 3: "Low"}
-    priority_colors = {1: COLORS["fail"], 2: COLORS["warning"], 3: COLORS["pass"]}
 
     for rec in sorted_recs:
         priority_label = priority_labels.get(rec.priority, "Unknown")
-        priority_color = priority_colors.get(rec.priority, "#666")
+        priority_color = PRIORITY_COLORS.get(rec.priority, "#666")
 
         with st.container():
             col1, col2 = st.columns([4, 1])

@@ -4,20 +4,9 @@ import streamlit as st
 from typing import Optional
 
 from pi_strategist.models import DeploymentCluster, DeploymentStrategy
-
-
-# Color scheme
-COLORS = {
-    "pass": "#28a745",
-    "fail": "#dc3545",
-    "warning": "#f39c12",
-    "info": "#3498db",
-}
-
-STRATEGY_COLORS = {
-    DeploymentStrategy.FEATURE_FLAG: "#9b59b6",
-    DeploymentStrategy.FULL_DEPLOYMENT: "#27ae60",
-}
+from pi_strategist.web.theme import COLORS, STRATEGY_COLORS, BORDER, BORDER_LIGHT, TEXT_MUTED
+from pi_strategist.web.components.charts import render_deployment_strategy_chart
+from pi_strategist.reporters.csv_export import deployment_to_csv, render_csv_download
 
 
 def render_deployment_analysis(
@@ -39,15 +28,25 @@ def render_deployment_analysis(
 
     st.markdown("---")
 
-    # Deployment timeline
-    st.subheader("Deployment Timeline")
-    _render_timeline(clusters)
+    # Strategy breakdown chart
+    chart_col1, chart_col2 = st.columns([1, 2])
+    with chart_col1:
+        st.markdown("#### Strategy Breakdown")
+        render_deployment_strategy_chart(clusters)
+    with chart_col2:
+        # Deployment timeline
+        st.markdown("#### Deployment Timeline")
+        _render_timeline(clusters)
 
     st.markdown("---")
 
     # Cluster details
     st.subheader("Cluster Details")
     _render_cluster_cards(clusters)
+
+    # CSV export
+    st.markdown("---")
+    render_csv_download(deployment_to_csv(clusters), "deployment_clusters.csv", "Download Deployment CSV")
 
 
 def _render_summary_metrics(
@@ -82,11 +81,11 @@ def _render_summary_metrics(
                      background: linear-gradient(to right, {COLORS['fail']} 0%, {COLORS['warning']} 50%, {COLORS['pass']} 100%);
                      border-radius: 200px 200px 0 0; overflow: hidden;">
                     <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-                         width: 160px; height: 80px; background: white; border-radius: 200px 200px 0 0;"></div>
+                         width: 160px; height: 80px; background: {BORDER}; border-radius: 200px 200px 0 0;"></div>
                     <div style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
                          font-size: 2em; font-weight: bold; color: {gauge_color};">{percentage:.1f}%</div>
                 </div>
-                <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                <div style="font-size: 0.9em; color: {TEXT_MUTED}; margin-top: 5px;">
                     {"✓ Target Met" if target_met else "⚠ Below Target"}
                 </div>
             </div>
@@ -125,7 +124,7 @@ def _render_timeline(clusters: list[DeploymentCluster]) -> None:
 
     # Create timeline visualization
     for i, cluster in enumerate(clusters):
-        strategy_color = STRATEGY_COLORS.get(cluster.strategy, "#666")
+        strategy_color = STRATEGY_COLORS.get(cluster.strategy, "{TEXT_MUTED}")
 
         cols = st.columns([1, 4])
 
@@ -151,7 +150,7 @@ def _render_timeline(clusters: list[DeploymentCluster]) -> None:
         if i < len(clusters) - 1:
             st.markdown(
                 """
-                <div style="margin-left: 40px; border-left: 3px solid #ddd; height: 20px;"></div>
+                <div style="margin-left: 40px; border-left: 3px solid {BORDER_LIGHT}; height: 20px;"></div>
                 """,
                 unsafe_allow_html=True,
             )
@@ -165,7 +164,7 @@ def _render_cluster_cards(clusters: list[DeploymentCluster]) -> None:
 
 def _render_cluster_card(cluster: DeploymentCluster) -> None:
     """Render a single cluster card."""
-    strategy_color = STRATEGY_COLORS.get(cluster.strategy, "#666")
+    strategy_color = STRATEGY_COLORS.get(cluster.strategy, "{TEXT_MUTED}")
     strategy_name = cluster.strategy.value.replace("_", " ").title()
 
     with st.expander(f"**{cluster.name}** | {strategy_name} | {len(cluster.tasks)} tasks"):
@@ -250,7 +249,7 @@ def render_strategy_legend() -> None:
     ]
 
     for strategy, name, description in strategies:
-        color = STRATEGY_COLORS.get(strategy, "#666")
+        color = STRATEGY_COLORS.get(strategy, "{TEXT_MUTED}")
         st.markdown(
             f"""
             <div style="display: flex; align-items: center; margin: 5px 0;">

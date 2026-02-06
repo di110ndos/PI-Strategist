@@ -1,11 +1,14 @@
 """Comprehensive PI Planner parser for multi-sheet Excel workbooks."""
 
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 from pi_strategist.models import CapacityPlan, Sprint, Task
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_discipline(discipline: str) -> str:
@@ -270,8 +273,8 @@ class PIPlannerParser:
                 if prio_val:
                     try:
                         priority = int(prio_val)
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric priority value '%s': %s", prio_val, exc)
 
             # Get description
             description = ""
@@ -328,8 +331,8 @@ class PIPlannerParser:
                                         analysis.sprints[sc_name] = {"capacity": 0, "projects": []}
                                     analysis.sprints[sc_name]["capacity"] = capacity
                                     analysis.total_capacity += capacity
-                                except (ValueError, TypeError):
-                                    pass
+                                except (ValueError, TypeError) as exc:
+                                    logger.warning("Non-numeric sprint capacity for %s: %s", sc_name, exc)
                     elif cell_lower in ["team member", "resource", "name"]:
                         resource_col = col_idx
                         header_row = row_idx
@@ -367,8 +370,8 @@ class PIPlannerParser:
                             analysis.overallocated_resources.append(
                                 (resource_name, sprint_name, abs(hours))
                             )
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric remaining hours for %s in %s: %s", resource_name, sprint_name, exc)
 
     def _parse_project_hours(self, sheet, analysis: PIAnalysis):
         """Parse project hours sheet for project-resource-hours mapping."""
@@ -443,8 +446,8 @@ class PIPlannerParser:
                 if rate_val is not None:
                     try:
                         analysis.resources[resource_name].rate = float(rate_val)
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric rate for %s: %s", resource_name, exc)
 
             # Get discipline/role and normalize it
             if discipline_col:
@@ -468,8 +471,8 @@ class PIPlannerParser:
                                 analysis.projects[project_name].total_hours += hours
 
                             # Don't accumulate total_allocated - it's recalculated in _cross_validate
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric project hours for %s / %s: %s", resource_name, project_name, exc)
 
     def _parse_resource_allocation(self, sheet, analysis: PIAnalysis):
         """Parse resource allocation worksheet for hours per person per project per sprint."""
@@ -554,8 +557,8 @@ class PIPlannerParser:
                     if total_val is not None:
                         try:
                             analysis.grand_total_hours = float(total_val)
-                        except (ValueError, TypeError):
-                            pass
+                        except (ValueError, TypeError) as exc:
+                            logger.warning("Non-numeric grand total hours: %s", exc)
                 continue  # Skip adding Total as a resource
 
             # Get or create resource
@@ -585,8 +588,8 @@ class PIPlannerParser:
                         if pct <= 2:  # Decimal format
                             pct = pct * 100
                         resource.allocation_percentage = pct
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric allocation % for %s: %s", resource.name, exc)
 
             # Get total hours
             if total_hours_col:
@@ -594,8 +597,8 @@ class PIPlannerParser:
                 if hours_val is not None:
                     try:
                         resource.total_hours = float(hours_val)
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric total hours for %s: %s", resource.name, exc)
 
             # Get hours per project per sprint
             for col_idx, (project_name, sprint_name) in sprint_cols.items():
@@ -623,8 +626,8 @@ class PIPlannerParser:
                             if project_name in analysis.projects:
                                 analysis.projects[project_name].sprint_allocation[normalized_sprint] = True
 
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric sprint hours for %s / %s: %s", resource.name, project_name, exc)
 
     def _parse_percentage(self, sheet, analysis: PIAnalysis):
         """Parse percentage allocation sheet for resource allocation percentages."""
@@ -682,8 +685,8 @@ class PIPlannerParser:
                         if pct <= 2:  # Likely a decimal
                             pct = pct * 100
                         analysis.resources[resource_name].allocation_percentage = pct
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric total allocation for %s: %s", resource_name, exc)
 
             # Also sum up project allocations
             total_project_pct = 0.0
@@ -695,8 +698,8 @@ class PIPlannerParser:
                         if pct <= 2:  # Likely a decimal
                             pct = pct * 100
                         total_project_pct += pct
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric project allocation for %s / %s: %s", resource_name, project_name, exc)
 
             # If no total allocation col, use summed project percentages
             if not total_alloc_col and total_project_pct > 0:
@@ -773,8 +776,8 @@ class PIPlannerParser:
                     try:
                         pto_hours = float(pto_val)
                         analysis.resources[resource_name].pto_hours["total"] = pto_hours
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Non-numeric PTO hours for %s: %s", resource_name, exc)
 
     def _parse_releases(self, sheet, analysis: PIAnalysis):
         """Parse release tracker sheet."""
