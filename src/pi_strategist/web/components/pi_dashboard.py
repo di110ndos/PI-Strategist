@@ -581,59 +581,6 @@ def _render_financial_summary(analysis, metrics: PIMetrics) -> None:
         st.markdown("#### Cost by Sprint")
         render_sprint_cost_chart(analysis)
 
-    st.markdown("---")
-
-    # Cost by discipline
-    st.markdown("#### Cost Breakdown by Discipline")
-    discipline_data = {}
-    for name, resource in analysis.resources.items():
-        disc = resource.discipline or "Other"
-        cost = resource.total_hours * resource.rate if resource.rate > 0 else 0
-        discipline_data[disc] = discipline_data.get(disc, 0) + cost
-
-    if discipline_data:
-        total = sum(discipline_data.values())
-        for disc, cost in sorted(discipline_data.items(), key=lambda x: -x[1]):
-            if cost > 0:
-                pct = (cost / total * 100) if total > 0 else 0
-                col1, col2, col3 = st.columns([2, 2, 1])
-                with col1:
-                    st.write(f"**{disc}**")
-                with col2:
-                    st.progress(pct / 100)
-                with col3:
-                    st.write(f"${cost:,.0f} ({pct:.0f}%)")
-
-    # Cost by sprint
-    st.markdown("---")
-    st.markdown("#### Cost by Sprint")
-
-    sprint_costs = {}
-    sprint_hours = {}
-    for sprint_name in analysis.sprints:
-        sprint_costs[sprint_name] = 0
-        sprint_hours[sprint_name] = 0
-        for resource_name, resource in analysis.resources.items():
-            # Use sprint_hours which contains actual allocated hours per sprint
-            hours = resource.sprint_hours.get(sprint_name, 0)
-            sprint_hours[sprint_name] += hours
-            if resource.rate > 0 and hours > 0:
-                sprint_costs[sprint_name] += hours * resource.rate
-
-    if any(sprint_costs.values()):
-        for sprint in sorted(sprint_costs.keys()):
-            cost = sprint_costs[sprint]
-            hours = sprint_hours[sprint]
-            col1, col2, col3 = st.columns([2, 1, 1])
-            with col1:
-                st.write(f"**{sprint}**")
-            with col2:
-                st.write(f"{hours:,.0f}h")
-            with col3:
-                st.write(f"${cost:,.0f}")
-    else:
-        st.info("Sprint-level cost data not available. Cost is calculated from total hours × rate.")
-
 
 def _render_timeline_view(analysis, plan) -> None:
     """Render timeline/Gantt-style view using the roadmap component."""
