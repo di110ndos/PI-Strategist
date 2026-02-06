@@ -3,7 +3,7 @@
  */
 
 import { useMutation } from '@tanstack/react-query';
-import { quickCheckApi, QuickCheckRequest } from '../api/endpoints/quickCheck';
+import { quickCheckApi, type QuickCheckRequest } from '../api/endpoints/quickCheck';
 import type { QuickCheckResponse } from '../types';
 
 export function useQuickCheck() {

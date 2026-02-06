@@ -12,7 +12,6 @@ import {
   CardBody,
   CardHeader,
   VStack,
-  Icon,
   Button,
   useColorModeValue,
 } from '@chakra-ui/react';
@@ -33,7 +32,6 @@ const features = [
     path: '/analyze',
     icon: '📊',
     color: 'green',
-    disabled: true, // Coming soon
   },
   {
     title: 'Scenarios',

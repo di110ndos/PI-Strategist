@@ -81,7 +81,6 @@ export default function QuickCheckPage() {
     setText(SAMPLE_TEXT);
   };
 
-  const bgColor = useColorModeValue('gray.50', 'gray.900');
   const cardBg = useColorModeValue('white', 'gray.800');
 
   return (

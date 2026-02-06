@@ -8,6 +8,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import HomePage from './pages/HomePage';
 import QuickCheckPage from './pages/QuickCheckPage';
+import AnalyzePage from './pages/AnalyzePage';
+import SettingsPage from './pages/SettingsPage';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -66,8 +68,14 @@ function Navigation() {
             PI Strategist
           </Box>
         </Link>
+        <Link to="/analyze">
+          <Box _hover={{ color: 'brand.400' }}>Analyze</Box>
+        </Link>
         <Link to="/quick-check">
           <Box _hover={{ color: 'brand.400' }}>Quick Check</Box>
+        </Link>
+        <Link to="/settings">
+          <Box _hover={{ color: 'brand.400' }}>Settings</Box>
         </Link>
       </Box>
     </Box>
@@ -83,7 +91,9 @@ function App() {
             <Navigation />
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/analyze" element={<AnalyzePage />} />
               <Route path="/quick-check" element={<QuickCheckPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </Box>
         </BrowserRouter>
