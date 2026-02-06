@@ -37,6 +37,7 @@ def render_capacity_burndown_chart(analyses) -> None:
         analyses: list[SprintAnalysis] from capacity_analyzer.
     """
     if not analyses:
+        st.info("No sprint data available for capacity chart.")
         return
 
     sprint_names = [a.sprint.name for a in analyses]
@@ -83,6 +84,7 @@ def render_utilization_trend_chart(analyses) -> None:
         analyses: list[SprintAnalysis] from capacity_analyzer.
     """
     if not analyses:
+        st.info("No sprint data available for utilization trend.")
         return
 
     sprint_names = [a.sprint.name for a in analyses]
@@ -241,7 +243,11 @@ def render_resource_heatmap(analysis) -> None:
     Args:
         analysis: PIAnalysis object with resources and sprints.
     """
-    if not analysis.resources or not analysis.sprints:
+    if not analysis.resources:
+        st.info("No resource data available for heatmap.")
+        return
+    if not analysis.sprints:
+        st.info("No sprint data available for heatmap.")
         return
 
     # Target hours per sprint (488h per PI / 4 sprints = ~122h per sprint)
