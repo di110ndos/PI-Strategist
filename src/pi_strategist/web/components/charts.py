@@ -482,6 +482,7 @@ def render_sprint_cost_chart(analysis) -> None:
         analysis: PIAnalysis object with resources and sprints.
     """
     if not analysis.resources or not analysis.sprints:
+        st.info("No sprint cost data available.")
         return
 
     sprint_costs: dict[str, float] = {}
@@ -493,6 +494,7 @@ def render_sprint_cost_chart(analysis) -> None:
                 sprint_costs[sprint_name] += hours * resource.rate
 
     if not any(sprint_costs.values()):
+        st.info("No cost data available. Ensure resources have rates and sprint hours assigned.")
         return
 
     labels = list(sprint_costs.keys())
