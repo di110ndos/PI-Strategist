@@ -262,9 +262,11 @@ def render_resource_heatmap(analysis) -> None:
         hovertext=hover_text,
         hovertemplate="%{hovertext}<extra></extra>",
         colorscale=[
-            [0.0, BORDER],
-            [0.3, BLUE],
+            [0.0, "#1a1a2e"],
+            [0.2, "#16213e"],
+            [0.4, BLUE],
             [0.6, CYAN],
+            [0.8, "#4ade80"],
             [1.0, GREEN],
         ],
         colorbar=dict(

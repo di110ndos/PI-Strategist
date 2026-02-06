@@ -334,20 +334,20 @@ def _render_resource_row(name: str, resource, max_hours: float) -> None:
 
     # Determine color and status
     if alloc_pct > 105:
-        color = "{RED}"
+        color = RED
         bg_color = "rgba(239,68,68,0.12)"
         status = "OVER"
     elif alloc_pct < 80 and total_hours > 0:
-        color = "{AMBER}"
+        color = AMBER
         bg_color = "rgba(245,158,11,0.12)"
         status = "UNDER"
     elif total_hours > 0:
-        color = "{GREEN}"
+        color = GREEN
         bg_color = "rgba(34,197,94,0.12)"
         status = "OK"
     else:
-        color = "{TEXT_MUTED}"
-        bg_color = "{BG_SURFACE_2}"
+        color = TEXT_MUTED
+        bg_color = BG_SURFACE_2
         status = "-"
 
     rate = resource.rate
@@ -444,7 +444,7 @@ def _render_sprint_capacity(analysis, plan) -> None:
     cols = st.columns(len(sprint_data))
     for i, data in enumerate(sprint_data):
         with cols[i]:
-            status_color = "{GREEN}" if data["Status"] == "PASS" else "{RED}"
+            status_color = GREEN if data["Status"] == "PASS" else RED
             st.markdown(
                 f"""
                 <div style="border: 2px solid {status_color}; border-radius: 10px; padding: 15px; text-align: center;">
@@ -471,7 +471,7 @@ def _render_sprint_capacity(analysis, plan) -> None:
             st.write(f"**{data['Sprint']}**")
         with col2:
             progress = min(data["Utilization"] / 100, 1.0)
-            color = "{GREEN}" if data["Utilization"] <= 80 else "{AMBER}" if data["Utilization"] <= 100 else "{RED}"
+            color = GREEN if data["Utilization"] <= 80 else AMBER if data["Utilization"] <= 100 else RED
             st.markdown(
                 f"""
                 <div style="background: {BORDER}; border-radius: 10px; height: 25px; position: relative;">
