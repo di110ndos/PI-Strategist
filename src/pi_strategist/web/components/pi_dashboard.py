@@ -360,13 +360,13 @@ def _render_resource_row(name: str, resource, max_hours: float) -> None:
         st.markdown(f"**{name}**")
 
     with cols[1]:
-        # Progress bar with percentage overlay
+        # Progress bar with percentage overlay - use white text with shadow for readability
         st.markdown(
             f'''<div style="position:relative;background:{BG_SURFACE_2};border-radius:6px;height:28px;overflow:hidden;">
-                <div style="background:{color};width:{bar_width}%;height:100%;opacity:0.7;"></div>
+                <div style="background:{color};width:{bar_width}%;height:100%;opacity:0.8;"></div>
                 <div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:0.85em;">
-                    <span style="color:{TEXT_MUTED};font-weight:500;">{total_hours:.0f}h / {max_hours:.0f}h</span>
-                    <span style="color:{color};font-weight:bold;">{alloc_pct:.0f}%</span>
+                    <span style="color:#ffffff;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.5);">{total_hours:.0f}h / {max_hours:.0f}h</span>
+                    <span style="color:#ffffff;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,0.5);">{alloc_pct:.0f}%</span>
                 </div>
             </div>''',
             unsafe_allow_html=True
@@ -475,8 +475,8 @@ def _render_sprint_capacity(analysis, plan) -> None:
             st.markdown(
                 f"""
                 <div style="background: {BORDER}; border-radius: 10px; height: 25px; position: relative;">
-                    <div style="background: {color}; width: {min(progress * 100, 100)}%; height: 100%; border-radius: 10px;"></div>
-                    <span style="position: absolute; right: 10px; top: 3px; font-size: 12px;">{data["Utilization"]:.0f}%</span>
+                    <div style="background: {color}; width: {min(progress * 100, 100)}%; height: 100%; border-radius: 10px; opacity: 0.85;"></div>
+                    <span style="position: absolute; right: 10px; top: 3px; font-size: 12px; color: #ffffff; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">{data["Utilization"]:.0f}%</span>
                 </div>
                 """,
                 unsafe_allow_html=True
