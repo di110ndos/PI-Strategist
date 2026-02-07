@@ -3,9 +3,9 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { analysisApi, type AnalysisRequest } from '../api/endpoints/analysis';
+import { analysisApi, aiInsightsApi, type AnalysisRequest, type InsightsRequest, type ChatRequest } from '../api/endpoints/analysis';
 import { filesApi } from '../api/endpoints/files';
-import type { AnalysisResponse } from '../types';
+import type { AnalysisResponse, AIInsightsResponse } from '../types';
 
 /**
  * Hook to upload a file.
@@ -88,6 +88,33 @@ export function useDeleteAnalysis() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['savedAnalyses'] });
     },
+  });
+}
+
+/**
+ * Hook to generate AI insights.
+ */
+export function useAIInsights() {
+  return useMutation<AIInsightsResponse, Error, InsightsRequest>({
+    mutationFn: aiInsightsApi.generateInsights,
+  });
+}
+
+/**
+ * Hook to generate rebalancing suggestions.
+ */
+export function useRebalancing() {
+  return useMutation<AIInsightsResponse, Error, InsightsRequest>({
+    mutationFn: aiInsightsApi.generateInsights,
+  });
+}
+
+/**
+ * Hook for AI follow-up chat.
+ */
+export function useAIChat() {
+  return useMutation<{ answer: string }, Error, ChatRequest>({
+    mutationFn: aiInsightsApi.chat,
   });
 }
 

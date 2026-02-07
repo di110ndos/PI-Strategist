@@ -77,9 +77,22 @@ export interface UploadedFile {
 // ─── Analysis Types ─────────────────────────────────────────────
 
 export interface AnalysisSummary {
-  risk: { total: number; critical: number; moderate: number; low: number };
-  capacity: { total_sprints: number; passing: number; failing: number };
-  deployment: { clusters: number };
+  risk: {
+    total: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  capacity: {
+    total_sprints: number;
+    passing: number;
+    failing: number;
+    average_utilization: number;
+  };
+  deployment?: {
+    total_clusters: number;
+    cd_eligible_percentage: number;
+  };
 }
 
 export interface AnalysisResponse {
@@ -88,4 +101,90 @@ export interface AnalysisResponse {
   created_at: string;
   results: Record<string, unknown>;
   summary: AnalysisSummary;
+}
+
+// ─── Chart Data Types ──────────────────────────────────────────
+
+export interface SprintAnalysisData {
+  sprint: {
+    name: string;
+    total_hours: number;
+    net_capacity: number;
+    sprint_load: number;
+    buffer_hours: number;
+    tasks: Array<{ id: string; name: string; hours: number }>;
+  };
+  status: string;
+  utilization_percent: number;
+  overflow_hours: number;
+  high_risk_tasks: Array<{ id: string; name: string; hours: number }>;
+  recommendations: Array<{
+    task: { id: string; name: string; hours: number };
+    from_sprint: string;
+    to_sprint: string;
+    reason: string;
+    priority: number;
+  }>;
+}
+
+export interface ResourceData {
+  name?: string;
+  discipline?: string;
+  total_hours: number;
+  rate?: number;
+  max_hours?: number;
+  allocation_percentage?: number;
+  sprint_hours?: Record<string, number>;
+  project_hours?: Record<string, number>;
+  status?: 'over' | 'under' | 'optimal';
+}
+
+export interface ProjectData {
+  name?: string;
+  total_hours: number;
+  priority?: number;
+  sprint_allocation?: Record<string, number>;
+}
+
+export interface PIAnalysisData {
+  resources?: Record<string, ResourceData>;
+  projects?: Record<string, ProjectData>;
+  sprints?: string[];
+  total_capacity?: number;
+  total_allocated?: number;
+  grand_total_hours?: number;
+}
+
+// ─── AI Insights Types ─────────────────────────────────────────
+
+export interface AIRecommendation {
+  category: string;
+  priority: string;
+  title: string;
+  description: string;
+  action_items: string[];
+  impact: string;
+  affected_resources: string[];
+  affected_sprints: string[];
+}
+
+export interface RebalancingSuggestion {
+  action: string;
+  reason: string;
+  priority: string;
+  impact: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AIInsightsResponse {
+  executive_summary: string;
+  recommendations: AIRecommendation[];
+  risk_assessment: string;
+  optimization_opportunities: string[];
+  key_metrics_commentary: string;
+  rebalancing_suggestions: RebalancingSuggestion[];
 }

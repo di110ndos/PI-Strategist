@@ -3,7 +3,7 @@
  */
 
 import apiClient from '../client';
-import type { AnalysisResponse } from '../../types';
+import type { AnalysisResponse, AIInsightsResponse, ChatMessage } from '../../types';
 
 export interface AnalysisRequest {
   ded_file_id?: string | null;
@@ -66,3 +66,32 @@ export const analysisApi = {
 };
 
 export default analysisApi;
+
+// ─── AI Insights API ──────────────────────────────────────────
+
+export interface InsightsRequest {
+  pi_analysis: Record<string, unknown>;
+  capacity_plan?: Record<string, unknown> | null;
+  red_flags?: unknown[] | null;
+  insight_type?: string;
+}
+
+export interface ChatRequest {
+  question: string;
+  pi_analysis: Record<string, unknown>;
+  capacity_plan?: Record<string, unknown> | null;
+  previous_insights?: AIInsightsResponse | null;
+  conversation_history: ChatMessage[];
+}
+
+export const aiInsightsApi = {
+  generateInsights: async (request: InsightsRequest): Promise<AIInsightsResponse> => {
+    const response = await apiClient.post<AIInsightsResponse>('/ai/insights', request);
+    return response.data;
+  },
+
+  chat: async (request: ChatRequest): Promise<{ answer: string }> => {
+    const response = await apiClient.post<{ answer: string }>('/ai/chat', request);
+    return response.data;
+  },
+};
