@@ -1,312 +1,304 @@
 # PI Strategist
 
-A dual-mode system for Program Increment (PI) planning analysis: a Claude Code custom agent for interactive analysis and a standalone CLI application for batch processing.
+A full-stack application for Program Increment (PI) planning analysis, powered by AI. Upload capacity planners and DED documents, get instant analysis of risks, capacity, and deployment readiness, then ask Claude for strategic recommendations.
 
-## Security Notice
+## Architecture
 
-**IMPORTANT: This tool is intended for INTERNAL use only with non-sensitive planning data.**
+```
+┌─────────────────────────────┐       ┌──────────────────────────────────┐
+│  React Frontend (Vite)      │       │  FastAPI Backend                 │
+│                             │ HTTP  │                                  │
+│  Chakra UI + React Query    │◄─────►│  Parsers ─► Analyzers ─► API    │
+│  Plotly Charts              │       │                    │             │
+│  Zustand State              │       │              Claude API          │
+└─────────────────────────────┘       │              (Opus 4.6)          │
+                                      └──────────────────────────────────┘
+```
 
-### Data Classification
+**Frontend:** React 19, TypeScript, Vite, Chakra UI v2, React Router v7, React Query v5, Zustand, react-plotly.js
 
-- **Allowed:** DED documents, capacity planners, sprint allocations, resource names, project names, hours, and rates
-- **NOT Allowed:**
-  - Customer PII or regulated data (HIPAA, PCI, etc.)
-  - Secrets, credentials, API keys, or connection strings
-  - Confidential business data beyond planning scope
+**Backend:** Python 3.10+, FastAPI, Pydantic, aiosqlite, Anthropic SDK
 
-### AI Processing Warning
+**AI Model:** Claude Opus 4.6 via Anthropic API
 
-When AI features are enabled, planning data (resource names, hours, allocations, project details) is sent to Anthropic's Claude API for analysis. Ensure this complies with your organization's data handling policies before use.
+## How AI Is Used
 
-### Data Cleanup
+PI Strategist uses Claude as an AI advisor that reads your PI planning data and provides strategic analysis. All AI features are optional — the core analysis (capacity validation, red flag detection, deployment mapping) runs locally without any API calls.
 
-After completing your planning session:
-1. Delete any saved analyses in the `saved_analyses/` directory
-2. Clear downloaded reports from your local machine
-3. Do not store exports containing planning data in shared locations without proper access controls
+### What Gets Sent to Claude
 
-### Shared Environment Warning
+When you use AI features, the backend builds a structured context from your parsed data and sends it to Claude. This includes:
 
-When running on shared servers, note that:
-- The `saved_analyses/` directory is accessible to all sessions on the same server
-- Saved analyses may contain resource names, hours, rates, and allocation data
+- Resource names, hours allocated, hourly rates
+- Project names, sprint allocations, priorities
+- Sprint capacity vs. load numbers
+- Red flags detected in DED documents (term, category, severity)
+
+Raw uploaded files are **never** sent — only the structured analysis results after parsing.
+
+### AI Features
+
+#### 1. Full Analysis (Generate Insights)
+
+The primary AI feature. Sends all analysis data to Claude with a prompt asking it to act as an expert PI Planning advisor with SAFe/Agile knowledge. Claude returns structured JSON containing:
+
+- **Executive Summary** — 2-3 paragraph leadership-ready overview with specific numbers
+- **Recommendations** — Categorized (capacity/risk/cost/resource) with priority levels, action items, impact assessments, and affected resources/sprints
+- **Risk Assessment** — Overall risk level and key concerns
+- **Optimization Opportunities** — Specific areas for improvement
+- **Key Metrics Commentary** — Analysis of the numbers
+
+The response is parsed through three strategies (direct JSON parse, markdown code block extraction, greedy regex match) for robustness.
+
+#### 2. Sprint Rebalancing
+
+Identifies overloaded sprints (>100% utilization) and underloaded sprints (<70%), then asks Claude to suggest 3-5 specific rebalancing actions like "Move X hours from Sprint Y to Sprint Z" with reasons and priority levels.
+
+#### 3. Follow-up Chat
+
+After generating insights, users can ask follow-up questions in a chat interface. The backend builds a conversation by:
+
+1. Injecting the full analysis context as a system preamble
+2. Including truncated previous AI insights (max 3000 chars)
+3. Appending the last 5 conversation exchanges for continuity
+4. Adding the new question
+
+Claude's responses are tailored for a PM/account manager audience — focusing on delivery risk, budget implications, and stakeholder-ready talking points.
+
+### Prompt Engineering
+
+Each AI feature uses a purpose-built prompt:
+
+| Feature | Persona | Output Format | Max Tokens |
+|---------|---------|---------------|------------|
+| Full Analysis | "Expert PI Planning advisor with deep knowledge of SAFe, Agile, and resource management" | Structured JSON with specific schema | 2000 |
+| Executive Summary | "PI Planning advisor" generating for leadership | Free-form text, 3-4 paragraphs | 1000 |
+| Rebalancing | Capacity-focused advisor | JSON array of actions | 1000 |
+| Chat | "Expert PI Planning advisor assisting PMs and account managers" | Conversational text | 1500 |
+
+### Reliability
+
+- **Retry logic** — API calls use exponential backoff (2-30s delays, 3 attempts) via tenacity for timeout and connection errors
+- **Timeout** — Full analysis has a 120-second timeout
+- **Graceful degradation** — If no API key is configured, the app works normally with AI buttons disabled
+- **Error sanitization** — API keys are stripped from all error messages before returning to the client
+
+### API Key Configuration
+
+Set your Anthropic API key in `backend/.env`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+The backend loads this via Pydantic Settings on startup. The `/health` endpoint reports whether AI is configured (`ai_configured: true/false`).
 
 ## Features
 
-- **Red Flag Detection**: Identifies ambiguous, subjective, or unmeasurable acceptance criteria in DEDs
-- **Capacity Validation**: Validates sprint loading against team capacity with recommendations
-- **Deployment Strategy**: Generates CD (Continuous Delivery) deployment clusters and strategies
-- **Multiple Input Formats**: Supports Word (.docx), Markdown (.md), PDF, and Excel (.xlsx)
-- **Rich Reports**: Generates HTML, JSON, or text reports
+### Core Analysis (No AI Required)
 
-## Installation
+- **Red Flag Detection** — Identifies ambiguous, subjective, or unmeasurable acceptance criteria in DED documents
+- **Capacity Validation** — Validates sprint loading against team capacity with pass/fail per sprint
+- **Deployment Strategy** — Generates CD deployment clusters and strategy recommendations
+- **Resource Heatmap** — Visual heat map of resource allocation across sprints
+- **Cost Analysis** — Cost breakdowns by discipline and sprint
+
+### AI-Powered (Requires API Key)
+
+- **Strategic Insights** — Full analysis with categorized recommendations
+- **Sprint Rebalancing** — Specific actions to fix overloaded sprints
+- **Follow-up Chat** — Ask questions about your analysis data
+- **Recommendation Filters** — Filter AI recommendations by priority and category
+
+### Input Formats
+
+- Excel capacity planners (.xlsx)
+- Word DED documents (.docx)
+- PDF documents (.pdf)
+- Markdown (.md)
+
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.10 or higher
-- pip (Python package manager)
+- Python 3.10+
+- Node.js 18+
+- An Anthropic API key (optional, for AI features)
 
-### Install from Source
+### Backend Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/pi-strategist.git
-cd pi-strategist
+cd backend
 
-# Install in development mode
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install the core package in editable mode
+pip install -e ..
+
+# Configure environment
+cp .env.example .env  # then edit .env with your API key
+
+# Start the server
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+```
+
+The frontend runs at `http://localhost:5173` and the API at `http://localhost:8000`.
+
+### CLI (Legacy)
+
+The original CLI is still available:
+
+```bash
 pip install -e .
 
-# Or install with development dependencies
-pip install -e ".[dev]"
-```
+# Analyze a DED with capacity planner
+pi-strategist analyze path/to/ded.md --excel path/to/capacity.xlsx
 
-### Install Dependencies Only
-
-```bash
-pip install click python-docx openpyxl pdfplumber jinja2 anthropic pydantic rich
-```
-
-## Quick Start
-
-### Analyze a DED Document
-
-```bash
-# Basic analysis (DED only)
-pi-strategist analyze path/to/your-ded.md
-
-# Full analysis with capacity planner
-pi-strategist analyze path/to/your-ded.md --excel path/to/capacity.xlsx
-
-# Specify output format
-pi-strategist analyze your-ded.md --format json --output ./reports
-```
-
-### Quick Red Flag Check
-
-```bash
-# Check individual text for red flags
+# Quick red flag check
 pi-strategist check "The system should be fast and user-friendly"
 ```
-
-### Batch Processing
-
-```bash
-# Process all documents in a directory
-pi-strategist batch --dir ./documents --output ./reports
-```
-
-## CLI Commands
-
-### `analyze`
-
-Analyze a DED document for risks, capacity, and deployment strategy.
-
-```bash
-pi-strategist analyze <ded-file> [OPTIONS]
-
-Options:
-  -e, --excel PATH    Excel capacity planner file
-  -o, --output PATH   Output directory for reports (default: ./output)
-  -f, --format TEXT   Output format: html, json, text (default: html)
-  -b, --buffer FLOAT  Buffer percentage (default: 0.20)
-```
-
-### `batch`
-
-Batch process all documents in a directory.
-
-```bash
-pi-strategist batch --dir <directory> [OPTIONS]
-
-Options:
-  -o, --output PATH   Output directory for reports
-  -f, --format TEXT   Output format: html, json, text
-```
-
-### `check`
-
-Quick check text for red flags.
-
-```bash
-pi-strategist check "your acceptance criteria text here"
-```
-
-### `config`
-
-Configure PI Strategist settings.
-
-```bash
-# Set API key for Claude integration
-pi-strategist config --set-api-key <your-api-key>
-
-# Show current configuration
-pi-strategist config --show
-```
-
-## Claude Code Agent Integration
-
-PI Strategist includes a custom Claude Code agent for interactive analysis.
-
-### Setup
-
-The agent configuration is located in `.claude/`:
-
-```
-.claude/
-├── config.json           # Project configuration
-├── agents/
-│   └── pi-strategist.json  # Agent configuration
-└── prompts/
-    └── pi-strategist.md    # System prompt
-```
-
-### Custom Commands
-
-When using Claude Code with the PI Strategist agent:
-
-- `/analyze-ded` - Full DED analysis with all three reports
-- `/check-capacity` - Capacity validation only
-- `/find-red-flags` - Risk identification only
-- `/deployment-map` - CD strategy only
-- `/negotiate` - Generate negotiation scripts for identified red flags
-
-## Reports
-
-PI Strategist generates three types of reports:
-
-### 1. Pushback Report
-
-Identifies red flags in acceptance criteria with:
-- Flagged term and category
-- Severity level (Critical, Moderate, Low)
-- Suggested measurable metric
-- Negotiation script for stakeholder discussions
-
-### 2. Capacity Check
-
-Validates sprint loading with:
-- Sprint capacity breakdown (total, buffer, net)
-- Load vs. capacity analysis
-- Pass/Fail status per sprint
-- Recommendations for overloaded sprints
-- High-risk task identification
-
-### 3. Deployment Map
-
-CD strategy with:
-- Task clusters for incremental deployment
-- Recommended deployment strategy per cluster
-- Deployment timeline
-- Rollback plans
-- CD percentage vs. target
-
-## Red Flag Categories
-
-| Category | Examples | Severity |
-|----------|----------|----------|
-| Subjective Terms | fast, user-friendly, simple, robust | Critical |
-| Vague Metrics | high quality, performant, scalable, secure | Critical |
-| Missing Criteria | works well, looks good, feels right | Moderate |
-| Undefined Scope | comprehensive, complete, all edge cases, etc. | Critical |
-| Comparative Terms | better, improved, enhanced, optimized | Moderate |
-| Time Ambiguity | soon, quickly, real-time, immediately | Moderate |
-| Quantity Ambiguity | many, few, several, most, some | Low-Moderate |
-
-## Capacity Formula
-
-```
-Net Capacity = Total Hours - (Total Hours × Buffer%)
-Sprint Status = PASS if Sprint Load ≤ Net Capacity, else FAIL
-```
-
-Default buffer: 20%
-
-## Deployment Strategies
-
-| Strategy | Use Case |
-|----------|----------|
-| Feature Flag | UI, user, notification, analytics, search features - allows instant rollback |
-| Full Deployment | Auth, payment, data, API, admin domains - requires full testing before release |
 
 ## Project Structure
 
 ```
 pi-strategist/
-├── .claude/                    # Claude Code agent configuration
-│   ├── config.json
-│   ├── agents/
-│   └── prompts/
-├── src/pi_strategist/          # Main package
-│   ├── cli.py                  # CLI application
-│   ├── models.py               # Data models
-│   ├── parsers/                # Document parsers
-│   │   ├── ded_parser.py
-│   │   └── excel_parser.py
-│   ├── analyzers/              # Analysis engines
-│   │   ├── risk_analyzer.py
-│   │   ├── capacity_analyzer.py
-│   │   └── deployment_analyzer.py
-│   └── reporters/              # Report generators
-│       ├── pushback_report.py
-│       ├── capacity_report.py
-│       └── deployment_map.py
-├── templates/                  # Document templates
-├── examples/                   # Sample documents
-├── tests/                      # Test suite
-├── pyproject.toml              # Project configuration
+├── frontend/                          # React + TypeScript SPA
+│   ├── src/
+│   │   ├── api/                       # API client and endpoint functions
+│   │   │   └── endpoints/
+│   │   │       ├── analysis.ts        # Analysis + AI insights API calls
+│   │   │       └── files.ts           # File upload API calls
+│   │   ├── components/
+│   │   │   ├── analysis/              # Analysis result tabs
+│   │   │   │   ├── AIInsightsTab.tsx   # AI insights, filters, rebalancing, chat
+│   │   │   │   ├── SummaryTab.tsx      # Overview with charts
+│   │   │   │   ├── CapacityTab.tsx     # Sprint capacity details
+│   │   │   │   ├── RedFlagsTab.tsx     # DED red flags
+│   │   │   │   ├── DeploymentTab.tsx   # CD deployment strategy
+│   │   │   │   └── PIDashboardTab.tsx  # Resource heatmap and costs
+│   │   │   ├── charts/                # Plotly chart components (lazy-loaded)
+│   │   │   ├── common/                # FileUpload, ErrorBoundary
+│   │   │   └── layout/                # AppShell, NavLink
+│   │   ├── hooks/useAnalysis.ts       # React Query hooks (including AI mutations)
+│   │   ├── pages/                     # Route pages
+│   │   ├── store/                     # Zustand state management
+│   │   ├── types/                     # TypeScript interfaces
+│   │   └── utils/                     # CSV/PDF export utilities
+│   └── package.json
+│
+├── backend/                           # FastAPI REST API
+│   ├── app/
+│   │   ├── api/v1/
+│   │   │   ├── endpoints/
+│   │   │   │   ├── analysis.py        # POST /analysis/full, CRUD /analyses
+│   │   │   │   ├── ai_insights.py     # POST /ai/insights, POST /ai/chat
+│   │   │   │   ├── files.py           # File upload/download
+│   │   │   │   ├── health.py          # Health check
+│   │   │   │   └── quick_check.py     # Quick red flag check
+│   │   │   └── router.py             # Route aggregation
+│   │   ├── core/
+│   │   │   ├── database.py            # SQLite via aiosqlite
+│   │   │   ├── file_storage.py        # File upload storage
+│   │   │   └── logging.py            # Structured logging
+│   │   ├── services/                  # Business logic services
+│   │   ├── config.py                  # Pydantic Settings (.env loading)
+│   │   └── main.py                    # FastAPI app with lifespan
+│   ├── tests/                         # Backend test suite
+│   └── requirements.txt
+│
+├── src/pi_strategist/                 # Core Python analysis library
+│   ├── analyzers/
+│   │   ├── ai_advisor.py              # AIAdvisor class (Claude API wrapper)
+│   │   ├── risk_analyzer.py           # Red flag detection
+│   │   ├── capacity_analyzer.py       # Sprint capacity validation
+│   │   └── deployment_analyzer.py     # CD strategy generation
+│   ├── parsers/                       # Document parsers (docx, xlsx, pdf, md)
+│   ├── reporters/                     # Report generators (HTML, JSON, text)
+│   └── cli.py                         # CLI entry point
+│
+├── tests/                             # Core library tests
+├── pyproject.toml                     # Python package config
 └── README.md
 ```
 
-## Writing Good Acceptance Criteria
+## API Endpoints
 
-### Avoid
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/health` | Health check (includes AI status) |
+| POST | `/api/v1/files/upload` | Upload Excel/Word/PDF files |
+| GET | `/api/v1/files` | List uploaded files |
+| POST | `/api/v1/analysis/full` | Run full analysis on uploaded files |
+| GET | `/api/v1/analyses` | List saved analyses |
+| GET | `/api/v1/analyses/{id}` | Get a saved analysis |
+| POST | `/api/v1/ai/insights` | Generate AI insights (full, summary, or rebalancing) |
+| POST | `/api/v1/ai/chat` | Follow-up chat about analysis results |
+| POST | `/api/v1/quick-check` | Quick red flag check on raw text |
 
-- "The system should be **fast**" ❌
-- "Provide **comprehensive** validation" ❌
-- "Ensure **high quality** output" ❌
-- "Handle **all edge cases**" ❌
+## Security Notice
 
-### Prefer
+**This tool is intended for internal use with non-sensitive planning data.**
 
-- "The system responds in <2 seconds at 95th percentile" ✓
-- "Validates: email format, MX record, disposable domain blocklist" ✓
-- "Passes all unit tests with ≥80% coverage" ✓
-- "Handles edge cases: empty input, max length, special characters" ✓
+### AI Data Processing
+
+When AI features are enabled, planning data (resource names, hours, rates, allocations, project details) is sent to Anthropic's Claude API. Ensure this complies with your organization's data handling policies.
+
+### What Is NOT Sent to Claude
+
+- Raw uploaded files (only parsed/structured data)
+- API keys or credentials
+- User session data
+
+### Data Cleanup
+
+After completing your planning session:
+1. Delete uploaded files via the UI or clear `backend/uploads/`
+2. Clear downloaded reports from your local machine
+3. Delete the SQLite database at `backend/uploads/pi_strategist.db` if needed
 
 ## Development
 
 ### Running Tests
 
 ```bash
-pytest
+# Backend tests
+cd backend && pytest
+
+# Frontend tests
+cd frontend && npm test
+
+# Core library tests
+pytest tests/
 ```
 
-### Code Formatting
+### Code Quality
 
 ```bash
-black src/
-ruff check src/
+# Frontend
+cd frontend && npm run lint
+
+# Backend
+black backend/
+ruff check backend/
 ```
-
-### Type Checking
-
-```bash
-mypy src/
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
 
 ## License
 
 MIT License - see LICENSE file for details.
-
-## Support
-
-- **Issues**: https://github.com/yourusername/pi-strategist/issues
-- **Documentation**: https://github.com/yourusername/pi-strategist#readme
