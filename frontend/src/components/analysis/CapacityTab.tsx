@@ -23,8 +23,11 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
+  Icon,
   useColorModeValue,
 } from '@chakra-ui/react';
+import { AlertTriangle } from 'lucide-react';
+import { CapacityBurndownChart, UtilizationTrendChart } from '../charts';
 
 interface SprintAnalysis {
   sprint: {
@@ -107,13 +110,29 @@ export default function CapacityTab({ capacityAnalysis }: CapacityTabProps) {
         </Stat>
       </StatGroup>
 
+      {/* Charts */}
+      <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
+        <Card>
+          <CardBody>
+            <Text fontWeight="bold" mb={2}>Capacity vs Load</Text>
+            <CapacityBurndownChart analyses={capacityAnalysis} />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <Text fontWeight="bold" mb={2}>Utilization Trend</Text>
+            <UtilizationTrendChart analyses={capacityAnalysis} />
+          </CardBody>
+        </Card>
+      </SimpleGrid>
+
       {/* Status Alert */}
       {failingSprints > 0 ? (
         <Alert status="error" borderRadius="md">
           <AlertIcon />
           <Text>
             <strong>{failingSprints} sprint{failingSprints !== 1 ? 's' : ''} overloaded</strong>
-            {' '}— Consider rebalancing tasks or adjusting scope.
+            {' '}&mdash; Consider rebalancing tasks or adjusting scope.
           </Text>
         </Alert>
       ) : overallUtilization > 80 ? (
@@ -240,16 +259,19 @@ function SprintCard({ analysis }: { analysis: SprintAnalysis }) {
             <Accordion allowToggle size="sm">
               <AccordionItem border="none">
                 <AccordionButton px={0}>
-                  <Text fontSize="sm" color="orange.400">
-                    ⚠️ High Risk Tasks ({high_risk_tasks.length})
-                  </Text>
+                  <HStack spacing={1}>
+                    <Icon as={AlertTriangle} boxSize={4} color="orange.400" />
+                    <Text fontSize="sm" color="orange.400">
+                      High Risk Tasks ({high_risk_tasks.length})
+                    </Text>
+                  </HStack>
                   <AccordionIcon ml={2} />
                 </AccordionButton>
                 <AccordionPanel px={0}>
                   <VStack align="stretch" spacing={1}>
                     {high_risk_tasks.map((task, idx) => (
                       <Text key={idx} fontSize="sm">
-                        • <strong>{task.id}</strong>: {task.name} ({task.hours}h)
+                        &bull; <strong>{task.id}</strong>: {task.name} ({task.hours}h)
                       </Text>
                     ))}
                   </VStack>
@@ -294,7 +316,7 @@ function RecommendationCard({
           <VStack align="start" spacing={1}>
             <Text fontWeight="medium">
               Move task <Badge>{recommendation.task.id}</Badge> from{' '}
-              {recommendation.from_sprint} → {recommendation.to_sprint}
+              {recommendation.from_sprint} &rarr; {recommendation.to_sprint}
             </Text>
             <Text fontSize="sm" color="gray.500">
               {recommendation.reason}

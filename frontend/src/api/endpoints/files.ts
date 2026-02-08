@@ -15,12 +15,7 @@ export const filesApi = {
 
     const response = await apiClient.post<UploadedFile>(
       `/files/upload?file_type=${fileType}`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
     );
     return response.data;
   },

@@ -1,0 +1,19 @@
+{
+  "app.title": "PI Strategist",
+  "nav.home": "Home",
+  "nav.analyze": "Analyze",
+  "nav.ded": "DED",
+  "nav.scenarios": "Scenarios",
+  "nav.compare": "Compare",
+  "nav.settings": "Settings",
+  "analyze.heading": "PI Analysis",
+  "ded.heading": "DED Analysis",
+  "scenarios.heading": "What-If Scenario Planning",
+  "compare.heading": "Compare Saved Analyses",
+  "common.analyze": "Analyze",
+  "common.reset": "Reset",
+  "common.export_pdf": "Export PDF",
+  "common.export_csv": "Export CSV",
+  "common.loading": "Loading...",
+  "common.error": "An error occurred"
+}

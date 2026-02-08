@@ -11,6 +11,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  SimpleGrid,
   Accordion,
   AccordionItem,
   AccordionButton,
@@ -23,6 +24,7 @@ import {
   StatLabel,
   StatNumber,
   StatGroup,
+  Icon,
   useColorModeValue,
   Tabs,
   TabList,
@@ -36,6 +38,8 @@ import {
   Th,
   Td,
 } from '@chakra-ui/react';
+import { AlertCircle, AlertTriangle, Lightbulb, MessageSquare } from 'lucide-react';
+import { RiskDistributionChart, RiskByCategoryChart } from '../charts';
 
 interface RedFlag {
   flagged_term: string;
@@ -60,10 +64,10 @@ const severityColors: Record<string, string> = {
   low: 'blue',
 };
 
-const severityIcons: Record<string, string> = {
-  critical: '🚨',
-  moderate: '⚠️',
-  low: '💡',
+const severityIcons: Record<string, typeof AlertCircle> = {
+  critical: AlertCircle,
+  moderate: AlertTriangle,
+  low: Lightbulb,
 };
 
 export default function RedFlagsTab({ redFlags }: RedFlagsTabProps) {
@@ -90,18 +94,53 @@ export default function RedFlagsTab({ redFlags }: RedFlagsTabProps) {
           <StatNumber>{redFlags.length}</StatNumber>
         </Stat>
         <Stat>
-          <StatLabel>🚨 Critical</StatLabel>
+          <StatLabel>
+            <HStack spacing={1}>
+              <Icon as={AlertCircle} boxSize={3} />
+              <Text>Critical</Text>
+            </HStack>
+          </StatLabel>
           <StatNumber color="red.500">{critical.length}</StatNumber>
         </Stat>
         <Stat>
-          <StatLabel>⚠️ Moderate</StatLabel>
+          <StatLabel>
+            <HStack spacing={1}>
+              <Icon as={AlertTriangle} boxSize={3} />
+              <Text>Moderate</Text>
+            </HStack>
+          </StatLabel>
           <StatNumber color="orange.500">{moderate.length}</StatNumber>
         </Stat>
         <Stat>
-          <StatLabel>💡 Low</StatLabel>
+          <StatLabel>
+            <HStack spacing={1}>
+              <Icon as={Lightbulb} boxSize={3} />
+              <Text>Low</Text>
+            </HStack>
+          </StatLabel>
           <StatNumber color="blue.500">{low.length}</StatNumber>
         </Stat>
       </StatGroup>
+
+      {/* Charts */}
+      <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
+        <Card>
+          <CardBody>
+            <Text fontWeight="bold" mb={2}>Severity Distribution</Text>
+            <RiskDistributionChart
+              critical={critical.length}
+              moderate={moderate.length}
+              low={low.length}
+            />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <Text fontWeight="bold" mb={2}>By Category</Text>
+            <RiskByCategoryChart redFlags={redFlags} />
+          </CardBody>
+        </Card>
+      </SimpleGrid>
 
       {/* Status Message */}
       {critical.length > 0 ? (
@@ -109,7 +148,7 @@ export default function RedFlagsTab({ redFlags }: RedFlagsTabProps) {
           <AlertIcon />
           <Text>
             <strong>{critical.length} critical issue{critical.length !== 1 ? 's' : ''} found</strong>
-            {' '}— These must be resolved before development begins.
+            {' '}&mdash; These must be resolved before development begins.
           </Text>
         </Alert>
       ) : moderate.length > 0 ? (
@@ -117,7 +156,7 @@ export default function RedFlagsTab({ redFlags }: RedFlagsTabProps) {
           <AlertIcon />
           <Text>
             <strong>{moderate.length} item{moderate.length !== 1 ? 's' : ''} need clarification</strong>
-            {' '}— Address these before sprint planning.
+            {' '}&mdash; Address these before sprint planning.
           </Text>
         </Alert>
       ) : (
@@ -125,14 +164,14 @@ export default function RedFlagsTab({ redFlags }: RedFlagsTabProps) {
           <AlertIcon />
           <Text>
             <strong>{low.length} minor suggestion{low.length !== 1 ? 's' : ''}</strong>
-            {' '}— Consider clarifying during development.
+            {' '}&mdash; Consider clarifying during development.
           </Text>
         </Alert>
       )}
 
       {/* View Tabs */}
       <Tabs colorScheme="blue">
-        <TabList>
+        <TabList flexWrap="wrap">
           <Tab>By Severity</Tab>
           <Tab>All Items</Tab>
           <Tab>Table View</Tab>
@@ -199,7 +238,10 @@ export default function RedFlagsTab({ redFlags }: RedFlagsTabProps) {
                     <Tr key={idx}>
                       <Td>
                         <Badge colorScheme={severityColors[flag.severity]}>
-                          {severityIcons[flag.severity]} {flag.severity}
+                          <HStack spacing={1}>
+                            <Icon as={severityIcons[flag.severity]} boxSize={3} />
+                            <Text>{flag.severity}</Text>
+                          </HStack>
                         </Badge>
                       </Td>
                       <Td>
@@ -240,6 +282,8 @@ function SeveritySection({
   severity: string;
   defaultExpanded?: boolean;
 }) {
+  const SevIcon = severityIcons[severity] || AlertCircle;
+
   return (
     <Accordion allowToggle defaultIndex={defaultExpanded ? [0] : []}>
       <AccordionItem border="none">
@@ -250,11 +294,11 @@ function SeveritySection({
         >
           <Box flex="1" textAlign="left">
             <HStack>
-              <Text fontSize="lg">{severityIcons[severity]}</Text>
+              <Icon as={SevIcon} boxSize={5} />
               <Text fontWeight="bold">{title}</Text>
               <Badge colorScheme={severityColors[severity]}>{flags.length}</Badge>
               <Text fontSize="sm" color="gray.500">
-                — {description}
+                &mdash; {description}
               </Text>
             </HStack>
           </Box>
@@ -275,6 +319,7 @@ function SeveritySection({
 // Red Flag Card Component
 function RedFlagCard({ flag, showSeverity }: { flag: RedFlag; showSeverity?: boolean }) {
   const cardBg = useColorModeValue('gray.50', 'gray.700');
+  const SevIcon = severityIcons[flag.severity] || AlertCircle;
 
   return (
     <Card bg={cardBg} size="sm">
@@ -283,7 +328,10 @@ function RedFlagCard({ flag, showSeverity }: { flag: RedFlag; showSeverity?: boo
           <HStack>
             {showSeverity && (
               <Badge colorScheme={severityColors[flag.severity]}>
-                {severityIcons[flag.severity]} {flag.severity}
+                <HStack spacing={1}>
+                  <Icon as={SevIcon} boxSize={3} />
+                  <Text>{flag.severity}</Text>
+                </HStack>
               </Badge>
             )}
             <Code fontWeight="bold">{flag.flagged_term}</Code>
@@ -330,9 +378,12 @@ function RedFlagCard({ flag, showSeverity }: { flag: RedFlag; showSeverity?: boo
           <Accordion allowToggle size="sm">
             <AccordionItem border="none">
               <AccordionButton px={0} _hover={{ bg: 'transparent' }}>
-                <Text fontSize="sm" color="blue.400">
-                  💬 How to discuss this
-                </Text>
+                <HStack spacing={1}>
+                  <Icon as={MessageSquare} boxSize={4} color="blue.400" />
+                  <Text fontSize="sm" color="blue.400">
+                    How to discuss this
+                  </Text>
+                </HStack>
                 <AccordionIcon ml={2} />
               </AccordionButton>
               <AccordionPanel px={0}>

@@ -27,6 +27,14 @@ class FileListResponse(BaseModel):
     files: list[FileUploadResponse]
 
 
+MAGIC_BYTES = {
+    "xlsx": b"\x50\x4b\x03\x04",  # ZIP (OOXML)
+    "xls": b"\xd0\xcf\x11\xe0",   # OLE2
+    "docx": b"\x50\x4b\x03\x04",  # ZIP (OOXML)
+    "pdf": b"%PDF",
+}
+
+
 @router.post("/upload", response_model=FileUploadResponse)
 async def upload_file(
     file: UploadFile = File(...),
@@ -50,13 +58,21 @@ async def upload_file(
     if file_type == "ded" and suffix not in ["docx", "doc", "md", "txt", "pdf"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid DED file type. Supported: docx, doc, md, txt, pdf",
+            detail="Invalid DED file type. Supported: docx, doc, md, txt, pdf",
         )
 
     if file_type == "excel" and suffix not in ["xlsx", "xls"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid Excel file type. Supported: xlsx, xls",
+            detail="Invalid Excel file type. Supported: xlsx, xls",
+        )
+
+    # Validate magic bytes for binary formats
+    expected_magic = MAGIC_BYTES.get(suffix)
+    if expected_magic and not content[:len(expected_magic)].startswith(expected_magic):
+        raise HTTPException(
+            status_code=400,
+            detail=f"File content does not match expected {suffix.upper()} format",
         )
 
     # Store file
@@ -74,7 +90,7 @@ async def upload_file(
 @router.get("", response_model=FileListResponse)
 async def list_files():
     """List all uploaded files."""
-    files = file_storage.list_files()
+    files = await file_storage.list_files()
     return FileListResponse(
         files=[
             FileUploadResponse(
@@ -92,6 +108,6 @@ async def list_files():
 @router.delete("/{file_id}")
 async def delete_file(file_id: str):
     """Delete an uploaded file."""
-    if not file_storage.delete(file_id):
+    if not await file_storage.delete(file_id):
         raise HTTPException(status_code=404, detail="File not found")
     return {"status": "deleted", "file_id": file_id}

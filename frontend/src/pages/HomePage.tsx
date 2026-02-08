@@ -4,7 +4,6 @@
 
 import {
   Box,
-  Container,
   Heading,
   Text,
   SimpleGrid,
@@ -13,8 +12,10 @@ import {
   CardHeader,
   VStack,
   Button,
+  Icon,
   useColorModeValue,
 } from '@chakra-ui/react';
+import { Zap, BarChart3, FlaskConical, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 // Feature cards data
@@ -23,21 +24,21 @@ const features = [
     title: 'Quick Check',
     description: 'Paste text to quickly analyze for red flags, obligations, and SLA metrics.',
     path: '/quick-check',
-    icon: '⚡',
+    icon: Zap,
     color: 'blue',
   },
   {
     title: 'Full Analysis',
     description: 'Upload DED documents and Excel capacity planners for comprehensive analysis.',
     path: '/analyze',
-    icon: '📊',
+    icon: BarChart3,
     color: 'green',
   },
   {
     title: 'Scenarios',
     description: 'Run what-if scenarios to explore capacity and resource options.',
     path: '/scenarios',
-    icon: '🔮',
+    icon: FlaskConical,
     color: 'purple',
     disabled: true,
   },
@@ -45,7 +46,7 @@ const features = [
     title: 'Compare',
     description: 'Compare saved analyses to track changes over time.',
     path: '/compare',
-    icon: '📈',
+    icon: TrendingUp,
     color: 'orange',
     disabled: true,
   },
@@ -57,7 +58,7 @@ export default function HomePage() {
 
   return (
     <Box bg={bgColor} minH="100vh">
-      <Container maxW="container.xl" py={12}>
+      <Box px={{ base: 4, md: 6, lg: 8 }} py={12}>
         <VStack spacing={12} align="stretch">
           {/* Hero Section */}
           <VStack spacing={4} textAlign="center">
@@ -81,7 +82,7 @@ export default function HomePage() {
               >
                 <CardHeader>
                   <VStack align="start" spacing={2}>
-                    <Text fontSize="3xl">{feature.icon}</Text>
+                    <Icon as={feature.icon} boxSize={8} color={`${feature.color}.400`} />
                     <Heading size="md">{feature.title}</Heading>
                   </VStack>
                 </CardHeader>
@@ -122,7 +123,7 @@ export default function HomePage() {
             </CardBody>
           </Card>
         </VStack>
-      </Container>
+      </Box>
     </Box>
   );
 }

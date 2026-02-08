@@ -13,7 +13,9 @@ import {
   Badge,
   HStack,
   IconButton,
+  Icon,
 } from '@chakra-ui/react';
+import { FileText, BarChart3, X } from 'lucide-react';
 
 interface FileUploadProps {
   label: string;
@@ -74,7 +76,7 @@ export default function FileUpload({
           {onRemove && (
             <IconButton
               aria-label="Remove file"
-              icon={<Text>×</Text>}
+              icon={<X size={16} />}
               size="sm"
               variant="ghost"
               colorScheme="red"
@@ -111,9 +113,11 @@ export default function FileUpload({
           </>
         ) : (
           <>
-            <Text fontSize="2xl">
-              {fileType === 'ded' ? '📄' : '📊'}
-            </Text>
+            <Icon
+              as={fileType === 'ded' ? FileText : BarChart3}
+              boxSize={8}
+              color="blue.400"
+            />
             <Text fontWeight="medium">{label}</Text>
             <Text fontSize="sm" color="gray.500">
               {isDragActive

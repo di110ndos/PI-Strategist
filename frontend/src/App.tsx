@@ -2,14 +2,19 @@
  * Main App component with providers and routing.
  */
 
-import { ChakraProvider, extendTheme, Box } from '@chakra-ui/react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { ChakraProvider, extendTheme, type StyleFunctionProps, Box } from '@chakra-ui/react';
+import { mode } from '@chakra-ui/theme-tools';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import ErrorBoundary from './components/common/ErrorBoundary';
+import AppShell from './components/layout/AppShell';
 import HomePage from './pages/HomePage';
 import QuickCheckPage from './pages/QuickCheckPage';
 import AnalyzePage from './pages/AnalyzePage';
-import SettingsPage from './pages/SettingsPage';
+import ScenariosPage from './pages/ScenariosPage';
+import ComparePage from './pages/ComparePage';
+import NotFoundPage from './pages/NotFoundPage';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -24,8 +29,8 @@ const queryClient = new QueryClient({
 // Extend Chakra theme with custom colors
 const theme = extendTheme({
   config: {
-    initialColorMode: 'dark',
-    useSystemColorMode: false,
+    initialColorMode: 'system',
+    useSystemColorMode: true,
   },
   colors: {
     brand: {
@@ -42,60 +47,35 @@ const theme = extendTheme({
     },
   },
   styles: {
-    global: {
+    global: (props: StyleFunctionProps) => ({
       body: {
-        bg: 'gray.900',
-        color: 'gray.100',
+        bg: mode('white', 'gray.900')(props),
+        color: mode('gray.800', 'gray.100')(props),
       },
-    },
+    }),
   },
 });
-
-// Navigation component
-function Navigation() {
-  return (
-    <Box
-      as="nav"
-      bg="gray.800"
-      px={6}
-      py={4}
-      borderBottom="1px"
-      borderColor="gray.700"
-    >
-      <Box display="flex" gap={6} alignItems="center" maxW="container.xl" mx="auto">
-        <Link to="/">
-          <Box fontWeight="bold" fontSize="lg" color="brand.500">
-            PI Strategist
-          </Box>
-        </Link>
-        <Link to="/analyze">
-          <Box _hover={{ color: 'brand.400' }}>Analyze</Box>
-        </Link>
-        <Link to="/quick-check">
-          <Box _hover={{ color: 'brand.400' }}>Quick Check</Box>
-        </Link>
-        <Link to="/settings">
-          <Box _hover={{ color: 'brand.400' }}>Settings</Box>
-        </Link>
-      </Box>
-    </Box>
-  );
-}
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ChakraProvider theme={theme}>
         <BrowserRouter>
-          <Box minH="100vh" bg="gray.900">
-            <Navigation />
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/analyze" element={<AnalyzePage />} />
-              <Route path="/quick-check" element={<QuickCheckPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-            </Routes>
-          </Box>
+          <ErrorBoundary>
+            <Box minH="100vh">
+              <AppShell>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/analyze" element={<AnalyzePage />} />
+                  <Route path="/ded" element={<QuickCheckPage />} />
+                  <Route path="/quick-check" element={<Navigate to="/ded" replace />} />
+                  <Route path="/scenarios" element={<ScenariosPage />} />
+                  <Route path="/compare" element={<ComparePage />} />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </AppShell>
+            </Box>
+          </ErrorBoundary>
         </BrowserRouter>
       </ChakraProvider>
     </QueryClientProvider>

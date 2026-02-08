@@ -3,9 +3,10 @@
 import sys
 from pathlib import Path
 
-# Add the src directory to the path so we can import pi_strategist
-src_path = Path(__file__).parent.parent.parent.parent / "src"
-sys.path.insert(0, str(src_path))
+# Ensure src/ is importable (editable install preferred: `pip install -e .`)
+src_path = str(Path(__file__).parent.parent.parent.parent / "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 from pi_strategist.analyzers.risk_analyzer import RiskAnalyzer
 

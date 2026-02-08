@@ -1,11 +1,10 @@
 /**
- * Full Analysis Page - Upload files and run comprehensive analysis.
+ * PI Analysis Page - Upload Excel capacity planner for comprehensive analysis.
  */
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Box,
-  Container,
   Heading,
   Text,
   VStack,
@@ -28,17 +27,23 @@ import {
   CardBody,
   Alert,
   AlertIcon,
-  Spinner,
+  Skeleton,
+  SkeletonText,
+  Icon,
   useColorModeValue,
   useToast,
 } from '@chakra-ui/react';
+import { ClipboardList, TrendingUp, Rocket, BarChart3, Sparkles } from 'lucide-react';
 
 import FileUpload from '../components/common/FileUpload';
-import RedFlagsTab from '../components/analysis/RedFlagsTab';
 import CapacityTab from '../components/analysis/CapacityTab';
 import SummaryTab from '../components/analysis/SummaryTab';
-import { useFileUpload, useRunAnalysis } from '../hooks/useAnalysis';
+import AIInsightsTab from '../components/analysis/AIInsightsTab';
+import DeploymentTab from '../components/analysis/DeploymentTab';
+import PIDashboardTab from '../components/analysis/PIDashboardTab';
+import { useFileUpload, useRunAnalysis, useSaveAnalysis } from '../hooks/useAnalysis';
 import { useSettingsStore } from '../store/settingsStore';
+import { useAnalysisStore } from '../store/analysisStore';
 import type { AnalysisResponse } from '../types';
 
 interface UploadedFileInfo {
@@ -50,45 +55,25 @@ export default function AnalyzePage() {
   const toast = useToast();
   const cardBg = useColorModeValue('white', 'gray.800');
 
-  // Settings
+  // Stores
   const { defaultBuffer, defaultCDTarget } = useSettingsStore();
+  const latestAnalysis = useAnalysisStore((s) => s.latestAnalysis);
+  const setLatestAnalysis = useAnalysisStore((s) => s.setLatestAnalysis);
+  const clearAnalysis = useAnalysisStore((s) => s.clearAnalysis);
   const [bufferPct, setBufferPct] = useState(defaultBuffer);
   const [cdTarget, setCdTarget] = useState(defaultCDTarget);
 
   // File state
-  const [dedFile, setDedFile] = useState<UploadedFileInfo | null>(null);
   const [excelFile, setExcelFile] = useState<UploadedFileInfo | null>(null);
 
-  // Analysis state
-  const [analysisResults, setAnalysisResults] = useState<AnalysisResponse | null>(null);
+  // Analysis state — initialize from store so results survive navigation
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResponse | null>(latestAnalysis);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   // Mutations
   const uploadMutation = useFileUpload();
   const analysisMutation = useRunAnalysis();
-
-  const handleDedUpload = (file: File) => {
-    uploadMutation.mutate(
-      { file, fileType: 'ded' },
-      {
-        onSuccess: (data) => {
-          setDedFile({ file_id: data.file_id, filename: data.filename });
-          toast({
-            title: 'DED file uploaded',
-            status: 'success',
-            duration: 2000,
-          });
-        },
-        onError: (error) => {
-          toast({
-            title: 'Upload failed',
-            description: error.message,
-            status: 'error',
-            duration: 4000,
-          });
-        },
-      }
-    );
-  };
+  const saveMutation = useSaveAnalysis();
 
   const handleExcelUpload = (file: File) => {
     uploadMutation.mutate(
@@ -115,26 +100,29 @@ export default function AnalyzePage() {
   };
 
   const handleAnalyze = () => {
-    if (!dedFile && !excelFile) {
+    if (!excelFile) {
       toast({
-        title: 'No files uploaded',
-        description: 'Please upload at least one file to analyze.',
+        title: 'No file uploaded',
+        description: 'Please upload an Excel capacity planner to analyze.',
         status: 'warning',
         duration: 3000,
       });
       return;
     }
 
+    setAnalysisError(null);
     analysisMutation.mutate(
       {
-        ded_file_id: dedFile?.file_id || null,
-        excel_file_id: excelFile?.file_id || null,
+        ded_file_id: null,
+        excel_file_id: excelFile.file_id,
         buffer_percentage: bufferPct / 100,
         cd_target_percentage: cdTarget / 100,
       },
       {
         onSuccess: (data) => {
           setAnalysisResults(data);
+          setAnalysisError(null);
+          setLatestAnalysis(data);
           toast({
             title: 'Analysis complete',
             status: 'success',
@@ -142,37 +130,60 @@ export default function AnalyzePage() {
           });
         },
         onError: (error) => {
-          toast({
-            title: 'Analysis failed',
-            description: error.message,
-            status: 'error',
-            duration: 4000,
-          });
+          setAnalysisError(error.message);
+        },
+      }
+    );
+  };
+
+  const handleSave = () => {
+    if (!analysisResults) return;
+    const now = new Date();
+    const name = excelFile?.filename || 'Analysis';
+    const year = String(now.getFullYear());
+    const quarter = `Q${Math.ceil((now.getMonth() + 1) / 3)}`;
+
+    saveMutation.mutate(
+      { analysisId: analysisResults.analysis_id, metadata: { name, year, quarter } },
+      {
+        onSuccess: () => {
+          toast({ title: 'Analysis saved for comparison', status: 'success', duration: 3000 });
+        },
+        onError: (error) => {
+          toast({ title: 'Save failed', description: error.message, status: 'error', duration: 4000 });
         },
       }
     );
   };
 
   const handleReset = () => {
-    setDedFile(null);
     setExcelFile(null);
     setAnalysisResults(null);
+    setAnalysisError(null);
+    clearAnalysis();
   };
+
+  // Preserve scroll position when switching tabs (short panels would otherwise
+  // shrink the page and snap scroll to top).
+  const handleTabChange = useCallback(() => {
+    const y = window.scrollY;
+    requestAnimationFrame(() => window.scrollTo(0, y));
+  }, []);
 
   const isAnalyzing = analysisMutation.isPending;
   const isUploading = uploadMutation.isPending;
 
   return (
-    <Container maxW="container.xl" py={8}>
+    <Box px={{ base: 4, md: 6, lg: 8 }} py={8}>
       <VStack spacing={6} align="stretch">
         {/* Header */}
         <Box>
           <Heading size="lg" mb={2}>
-            Full DED Analysis
+            PI Analysis
           </Heading>
           <Text color="gray.500">
-            Upload your DED document and Excel capacity planner for comprehensive analysis
-            of risks, capacity, and deployment strategies.
+            Upload your Excel capacity planner for comprehensive analysis
+            of capacity, deployment strategies, and PI metrics.
           </Text>
         </Box>
 
@@ -180,35 +191,19 @@ export default function AnalyzePage() {
         <Card bg={cardBg}>
           <CardBody>
             <VStack spacing={4} align="stretch">
-              <Heading size="sm">Upload Files</Heading>
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                <FileUpload
-                  label="DED Document"
-                  accept={{
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-                    'text/markdown': ['.md'],
-                    'text/plain': ['.txt'],
-                    'application/pdf': ['.pdf'],
-                  }}
-                  fileType="ded"
-                  uploadedFile={dedFile}
-                  isUploading={isUploading && !dedFile}
-                  onUpload={handleDedUpload}
-                  onRemove={() => setDedFile(null)}
-                />
-                <FileUpload
-                  label="Excel Capacity Planner"
-                  accept={{
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-                    'application/vnd.ms-excel': ['.xls'],
-                  }}
-                  fileType="excel"
-                  uploadedFile={excelFile}
-                  isUploading={isUploading && !excelFile}
-                  onUpload={handleExcelUpload}
-                  onRemove={() => setExcelFile(null)}
-                />
-              </SimpleGrid>
+              <Heading size="sm">Upload File</Heading>
+              <FileUpload
+                label="Excel Capacity Planner"
+                accept={{
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+                  'application/vnd.ms-excel': ['.xls'],
+                }}
+                fileType="excel"
+                uploadedFile={excelFile}
+                isUploading={isUploading && !excelFile}
+                onUpload={handleExcelUpload}
+                onRemove={() => setExcelFile(null)}
+              />
             </VStack>
           </CardBody>
         </Card>
@@ -272,54 +267,105 @@ export default function AnalyzePage() {
             onClick={handleAnalyze}
             isLoading={isAnalyzing}
             loadingText="Analyzing..."
-            isDisabled={!dedFile && !excelFile}
+            isDisabled={!excelFile}
           >
             Analyze
           </Button>
-          {(dedFile || excelFile || analysisResults) && (
+          {(excelFile || analysisResults) && (
             <Button variant="outline" onClick={handleReset}>
               Reset
             </Button>
           )}
         </HStack>
 
-        {/* Loading State */}
+        {/* Loading State — skeleton cards */}
         {isAnalyzing && (
-          <Box textAlign="center" py={8}>
-            <Spinner size="xl" color="blue.500" />
-            <Text mt={4} color="gray.500">
-              Running analysis... This may take a moment.
-            </Text>
-          </Box>
+          <Card bg={cardBg}>
+            <CardBody>
+              <VStack spacing={6} align="stretch">
+                <Skeleton height="20px" width="200px" />
+                <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+                  {[1, 2, 3, 4].map((i) => (
+                    <Box key={i}>
+                      <Skeleton height="12px" width="80px" mb={2} />
+                      <Skeleton height="28px" width="60px" />
+                    </Box>
+                  ))}
+                </SimpleGrid>
+                <SkeletonText noOfLines={4} spacing="4" />
+                <Skeleton height="200px" borderRadius="md" />
+              </VStack>
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Error Display */}
+        {analysisError && !isAnalyzing && (
+          <Alert status="error" borderRadius="md" alignItems="flex-start">
+            <AlertIcon mt={1} />
+            <Box flex="1">
+              <Text fontWeight="bold" mb={2}>Analysis Failed</Text>
+              <Box
+                as="pre"
+                fontSize="xs"
+                whiteSpace="pre-wrap"
+                wordBreak="break-word"
+                bg="red.50"
+                _dark={{ bg: 'red.900' }}
+                p={3}
+                borderRadius="md"
+                maxH="400px"
+                overflowY="auto"
+              >
+                {analysisError}
+              </Box>
+            </Box>
+          </Alert>
         )}
 
         {/* Results */}
         {analysisResults && !isAnalyzing && (
           <Card bg={cardBg}>
             <CardBody>
-              <Tabs colorScheme="blue">
+              <HStack justify="flex-end" mb={4}>
+                <Button
+                  size="sm"
+                  colorScheme="green"
+                  variant="outline"
+                  onClick={handleSave}
+                  isLoading={saveMutation.isPending}
+                  loadingText="Saving..."
+                >
+                  Save for Comparison
+                </Button>
+              </HStack>
+              <Tabs colorScheme="blue" onChange={handleTabChange}>
                 <TabList flexWrap="wrap">
                   <Tab>
-                    📋 Summary
+                    <Icon as={ClipboardList} boxSize={4} mr={2} />
+                    Summary
                   </Tab>
                   <Tab>
-                    🚩 Red Flags
-                    {analysisResults.summary.risk.total > 0 && (
-                      <Badge ml={2} colorScheme="red">
-                        {analysisResults.summary.risk.total}
-                      </Badge>
-                    )}
+                    <Icon as={Sparkles} boxSize={4} mr={2} />
+                    AI Insights
                   </Tab>
                   <Tab>
-                    📈 Capacity
+                    <Icon as={TrendingUp} boxSize={4} mr={2} />
+                    Capacity
                     {analysisResults.summary.capacity.failing > 0 && (
                       <Badge ml={2} colorScheme="orange">
                         {analysisResults.summary.capacity.failing} issues
                       </Badge>
                     )}
                   </Tab>
-                  <Tab>🚀 Deployment</Tab>
-                  <Tab>📊 PI Dashboard</Tab>
+                  <Tab>
+                    <Icon as={Rocket} boxSize={4} mr={2} />
+                    Deployment
+                  </Tab>
+                  <Tab>
+                    <Icon as={BarChart3} boxSize={4} mr={2} />
+                    PI Dashboard
+                  </Tab>
                 </TabList>
 
                 <TabPanels>
@@ -331,11 +377,9 @@ export default function AnalyzePage() {
                     />
                   </TabPanel>
 
-                  {/* Red Flags Tab */}
+                  {/* AI Insights Tab */}
                   <TabPanel>
-                    <RedFlagsTab
-                      redFlags={analysisResults.results.red_flags as any[] || []}
-                    />
+                    <AIInsightsTab results={analysisResults.results} />
                   </TabPanel>
 
                   {/* Capacity Tab */}
@@ -347,18 +391,17 @@ export default function AnalyzePage() {
 
                   {/* Deployment Tab */}
                   <TabPanel>
-                    <Alert status="info">
-                      <AlertIcon />
-                      Deployment analysis view coming soon.
-                    </Alert>
+                    <DeploymentTab
+                      deploymentClusters={analysisResults.results.deployment_clusters as any[] || []}
+                    />
                   </TabPanel>
 
                   {/* PI Dashboard Tab */}
                   <TabPanel>
-                    <Alert status="info">
-                      <AlertIcon />
-                      PI Dashboard view coming soon.
-                    </Alert>
+                    <PIDashboardTab
+                      results={analysisResults.results}
+                      summary={analysisResults.summary}
+                    />
                   </TabPanel>
                 </TabPanels>
               </Tabs>
@@ -366,6 +409,6 @@ export default function AnalyzePage() {
           </Card>
         )}
       </VStack>
-    </Container>
+    </Box>
   );
 }

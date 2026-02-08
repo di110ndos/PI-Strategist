@@ -1,0 +1,27 @@
+"""Shared test fixtures."""
+
+import os
+import tempfile
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+# Override upload dir before importing app
+_tmp = tempfile.mkdtemp(prefix="pi_strategist_test_")
+os.environ["UPLOAD_DIR"] = _tmp
+
+from app.main import app  # noqa: E402
+
+
+@pytest.fixture()
+def client():
+    """FastAPI TestClient for synchronous tests."""
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture()
+def tmp_upload_dir() -> Path:
+    """Return the temporary upload directory for this test session."""
+    return Path(_tmp)
