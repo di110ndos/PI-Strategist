@@ -82,6 +82,7 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
 
   // ─── Chat ───────────────────────────────────────────────────
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const chatHistoryRef = useRef<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const chatMutation = useAIChat();
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -101,6 +102,7 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
           setPriorityFilters(new Set());
           setCategoryFilters(new Set());
           setRebalancingSuggestions([]);
+          chatHistoryRef.current = [];
           setChatHistory([]);
         },
       }
@@ -128,7 +130,10 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
     if (!question || chatMutation.isPending) return;
 
     const userMsg: ChatMessage = { role: 'user', content: question };
-    setChatHistory((prev) => [...prev, userMsg]);
+    // Use ref for the history sent to backend (avoids stale closure in rapid-fire)
+    const historyBeforeThisMessage = [...chatHistoryRef.current];
+    chatHistoryRef.current = [...chatHistoryRef.current, userMsg];
+    setChatHistory(chatHistoryRef.current);
     setChatInput('');
 
     chatMutation.mutate(
@@ -137,22 +142,23 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
         pi_analysis: (results.pi_analysis || {}) as Record<string, unknown>,
         capacity_plan: (results.capacity_plan as Record<string, unknown>) || null,
         previous_insights: insights,
-        conversation_history: chatHistory,
+        conversation_history: historyBeforeThisMessage,
       },
       {
         onSuccess: (data) => {
-          setChatHistory((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+          const assistantMsg: ChatMessage = { role: 'assistant', content: data.answer };
+          chatHistoryRef.current = [...chatHistoryRef.current, assistantMsg];
+          setChatHistory(chatHistoryRef.current);
           setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         },
         onError: (err) => {
-          setChatHistory((prev) => [
-            ...prev,
-            { role: 'assistant', content: `Sorry, I couldn't process that: ${err.message}` },
-          ]);
+          const errorMsg: ChatMessage = { role: 'assistant', content: `Sorry, I couldn't process that: ${err.message}` };
+          chatHistoryRef.current = [...chatHistoryRef.current, errorMsg];
+          setChatHistory(chatHistoryRef.current);
         },
       }
     );
-  }, [chatInput, chatMutation, chatHistory, insights, results]);
+  }, [chatInput, chatMutation, insights, results]);
 
   // ─── Filtered Recommendations ───────────────────────────────
   const recs = insights?.recommendations ?? [];

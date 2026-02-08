@@ -82,7 +82,9 @@ class _DictProxy:
     def __getattr__(self, name: str):
         if name.startswith("_"):
             return super().__getattribute__(name)
-        val = self._data.get(name)
+        if name not in self._data:
+            raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
+        val = self._data[name]
         if isinstance(val, dict):
             return _DictProxy(val)
         if isinstance(val, list):

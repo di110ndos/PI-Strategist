@@ -191,11 +191,12 @@ async def run_full_analysis(request: AnalysisRequest):
         summary = AnalysisSummary(**summary_data)
 
         # Persist to SQLite
+        now = datetime.utcnow()
         db = await get_db()
         try:
             await db.execute(
                 "INSERT INTO analyses (analysis_id, status, created_at, results, summary) VALUES (?, ?, ?, ?, ?)",
-                (analysis_id, "completed", datetime.utcnow().isoformat(), json.dumps(results), json.dumps(summary_data)),
+                (analysis_id, "completed", now.isoformat(), json.dumps(results), json.dumps(summary_data)),
             )
             await db.commit()
         finally:
@@ -204,7 +205,7 @@ async def run_full_analysis(request: AnalysisRequest):
         return AnalysisResponse(
             analysis_id=analysis_id,
             status="completed",
-            created_at=datetime.utcnow(),
+            created_at=now,
             results=results,
             summary=summary,
         )
@@ -284,7 +285,7 @@ async def get_saved_analysis(analysis_id: str):
         raise HTTPException(status_code=404, detail="Analysis not found")
 
     return {
-        "id": row["analysis_id"],
+        "analysis_id": row["analysis_id"],
         "status": row["status"],
         "created_at": row["created_at"],
         "results": json.loads(row["results"]),
