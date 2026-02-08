@@ -55,13 +55,17 @@ import {
   ModalBody,
   ModalFooter,
   ModalCloseButton,
+  Icon,
   useDisclosure,
   useColorModeValue,
   useToast,
   Divider,
 } from '@chakra-ui/react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAnalysisStore } from '../store/analysisStore';
+import { LazyPlot } from '../components/charts';
+import { plotlyLayout, PLOTLY_CONFIG, CHART_PALETTE, TEXT_MUTED } from '../components/charts/plotlyDefaults';
 
 // Types
 interface Resource {
@@ -628,6 +632,14 @@ function ScenarioEditor({ scenario, baseAnalysis, baseCost, onUpdate, onDelete }
             </Text>
           </Alert>
 
+          {/* Utilization Impact Gauge */}
+          <UtilizationImpactGauge
+            baselineUtilization={baseAnalysis.total_capacity > 0
+              ? (baseAnalysis.total_allocated / baseAnalysis.total_capacity) * 100
+              : 0}
+            scenarioUtilization={modifiedUtilization}
+          />
+
           {/* Metrics */}
           <SimpleGrid columns={3} spacing={4}>
             <Stat>
@@ -706,6 +718,59 @@ function ScenarioComparison({ scenarios, baseAnalysis, baseCost }: ScenarioCompa
   return (
     <VStack spacing={6} align="stretch">
       <Text fontWeight="bold" fontSize="lg">Scenario Comparison</Text>
+
+      {/* Multi-Scenario Comparison Chart */}
+      {scenarios.length >= 2 && (
+        <Box>
+          <LazyPlot
+            data={[
+              // Baseline trace
+              {
+                type: 'bar',
+                name: 'Baseline',
+                x: ['Hours', 'Cost ($)', 'Utilization (%)'],
+                y: [baseAnalysis.total_allocated, baseCost, baseUtilization],
+                marker: { color: TEXT_MUTED },
+                text: [
+                  `${baseAnalysis.total_allocated.toLocaleString()}h`,
+                  `$${baseCost.toLocaleString()}`,
+                  `${baseUtilization.toFixed(1)}%`,
+                ],
+                textposition: 'outside',
+              },
+              // One trace per scenario
+              ...scenarioImpacts.map(({ scenario, impact }, idx) => {
+                const util = impact.modified_capacity > 0
+                  ? (impact.modified_allocated / impact.modified_capacity) * 100
+                  : 0;
+                return {
+                  type: 'bar' as const,
+                  name: scenario.name,
+                  x: ['Hours', 'Cost ($)', 'Utilization (%)'],
+                  y: [impact.modified_allocated, impact.modified_cost, util],
+                  marker: { color: CHART_PALETTE[idx % CHART_PALETTE.length] },
+                  text: [
+                    `${impact.modified_allocated.toLocaleString()}h`,
+                    `$${impact.modified_cost.toLocaleString()}`,
+                    `${util.toFixed(1)}%`,
+                  ],
+                  textposition: 'outside' as const,
+                };
+              }),
+            ]}
+            layout={plotlyLayout({
+              barmode: 'group',
+              height: 320,
+              yaxis: { title: { text: 'Value' }, gridcolor: '#2a2a30', zerolinecolor: '#35353d' },
+              xaxis: { gridcolor: '#2a2a30', zerolinecolor: '#35353d' },
+              legend: { orientation: 'h', y: 1.18, x: 0.5, xanchor: 'center', bgcolor: 'rgba(0,0,0,0)', bordercolor: '#2a2a30', font: { color: TEXT_MUTED } },
+              margin: { l: 60, r: 40, t: 60, b: 40 },
+            })}
+            config={PLOTLY_CONFIG}
+            style={{ width: '100%', height: '320px' }}
+          />
+        </Box>
+      )}
 
       <Box overflowX="auto">
       <Table variant="simple">
@@ -825,5 +890,64 @@ function ScenarioComparison({ scenarios, baseAnalysis, baseCost }: ScenarioCompa
         })()}
       </Box>
     </VStack>
+  );
+}
+
+// ─── Utilization Impact Gauge ───────────────────────────────────
+
+interface UtilizationImpactGaugeProps {
+  baselineUtilization: number;
+  scenarioUtilization: number;
+}
+
+function UtilizationImpactGauge({ baselineUtilization, scenarioUtilization }: UtilizationImpactGaugeProps) {
+  const delta = scenarioUtilization - baselineUtilization;
+  const isUp = delta >= 0;
+
+  // Optimal range is 80-100%. Determine if moving toward or away from it.
+  const baseDistFromOptimal = baselineUtilization < 80
+    ? 80 - baselineUtilization
+    : baselineUtilization > 100
+    ? baselineUtilization - 100
+    : 0;
+  const scenarioDistFromOptimal = scenarioUtilization < 80
+    ? 80 - scenarioUtilization
+    : scenarioUtilization > 100
+    ? scenarioUtilization - 100
+    : 0;
+  const movingTowardOptimal = scenarioDistFromOptimal < baseDistFromOptimal;
+  const inOptimal = scenarioUtilization >= 80 && scenarioUtilization <= 100;
+
+  const badgeColor = inOptimal
+    ? 'green'
+    : movingTowardOptimal
+    ? 'green'
+    : 'red';
+
+  const label = inOptimal
+    ? 'In Optimal Range'
+    : movingTowardOptimal
+    ? 'Toward Optimal'
+    : 'Away from Optimal';
+
+  return (
+    <HStack spacing={3} p={3} borderWidth="1px" borderRadius="md" borderColor="gray.600">
+      <Badge colorScheme={badgeColor} fontSize="sm" px={2} py={1}>
+        {scenarioUtilization.toFixed(1)}%
+      </Badge>
+      <Icon
+        as={isUp ? TrendingUp : TrendingDown}
+        boxSize={4}
+        color={movingTowardOptimal || inOptimal ? 'green.400' : 'red.400'}
+      />
+      <Text fontSize="sm" color={movingTowardOptimal || inOptimal ? 'green.400' : 'red.400'}>
+        {label} (80-100%)
+      </Text>
+      {Math.abs(delta) > 0.05 && (
+        <Text fontSize="xs" color="gray.500">
+          {isUp ? '+' : ''}{delta.toFixed(1)}% from baseline
+        </Text>
+      )}
+    </HStack>
   );
 }

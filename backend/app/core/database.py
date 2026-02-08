@@ -39,8 +39,42 @@ CREATE TABLE IF NOT EXISTS analyses (
     metadata TEXT
 );
 
+CREATE TABLE IF NOT EXISTS objectives (
+    objective_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    analysis_id TEXT,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    objective_type TEXT NOT NULL DEFAULT 'committed',
+    business_value INTEGER NOT NULL DEFAULT 5,
+    status TEXT NOT NULL DEFAULT 'planned',
+    acceptance_criteria TEXT NOT NULL DEFAULT '',
+    linked_stories TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS risks (
+    risk_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    analysis_id TEXT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'general',
+    probability INTEGER NOT NULL DEFAULT 3,
+    impact INTEGER NOT NULL DEFAULT 3,
+    risk_score INTEGER NOT NULL DEFAULT 9,
+    owner TEXT NOT NULL DEFAULT '',
+    mitigation_plan TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_files_session ON files(session_id);
 CREATE INDEX IF NOT EXISTS idx_analyses_session ON analyses(session_id);
+CREATE INDEX IF NOT EXISTS idx_objectives_session ON objectives(session_id);
+CREATE INDEX IF NOT EXISTS idx_risks_session ON risks(session_id);
 """
 
 _initialized = False

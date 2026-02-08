@@ -29,6 +29,7 @@ class ExcelParser:
             default_buffer: Default buffer percentage (0.20 = 20%)
         """
         self.default_buffer = default_buffer
+        self.warnings: list[str] = []
         self._openpyxl_available = self._check_openpyxl()
 
     def _check_openpyxl(self) -> bool:
@@ -51,6 +52,8 @@ class ExcelParser:
         if not self._openpyxl_available:
             raise ImportError("openpyxl is required to parse Excel files")
 
+        self.warnings = []
+
         path = Path(file_path)
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -59,7 +62,11 @@ class ExcelParser:
         if suffix not in (".xlsx", ".xls"):
             raise ValueError(f"Unsupported file format: {suffix}")
 
-        return self._parse_excel(path)
+        plan = self._parse_excel(path)
+        self._validate_sprint_names(plan)
+        self._detect_dependency_cycles(plan)
+        plan.warnings = self.warnings
+        return plan
 
     def _parse_excel(self, path: Path) -> CapacityPlan:
         """Parse an Excel workbook."""
@@ -538,6 +545,9 @@ class ExcelParser:
             try:
                 return float(cell.value)
             except (ValueError, TypeError):
+                self.warnings.append(
+                    f"Row {row_idx}: could not parse '{cell.value}' as number in column '{col_name}'"
+                )
                 return 0.0
 
         task_id = get_cell_value("task_id")
@@ -592,6 +602,48 @@ class ExcelParser:
                                 continue
 
         return 0.0
+
+    def _validate_sprint_names(self, plan: CapacityPlan) -> None:
+        """Validate sprint names, assigning defaults for empty ones."""
+        for i, sprint in enumerate(plan.sprints):
+            if not sprint.name or not sprint.name.strip():
+                default_name = f"Sprint {i + 1}"
+                self.warnings.append(
+                    f"Sprint at index {i} has empty name, assigned default: '{default_name}'"
+                )
+                sprint.name = default_name
+
+    def _detect_dependency_cycles(self, plan: CapacityPlan) -> None:
+        """Detect circular dependencies among tasks using DFS."""
+        all_tasks = plan.all_tasks
+        # Build adjacency list from task dependencies
+        graph: dict[str, list[str]] = {}
+        task_ids = {t.id for t in all_tasks}
+        for task in all_tasks:
+            graph[task.id] = [dep for dep in task.dependencies if dep in task_ids]
+
+        visited: set[str] = set()
+        in_stack: set[str] = set()
+
+        def dfs(node: str, path: list[str]) -> bool:
+            visited.add(node)
+            in_stack.add(node)
+            for neighbor in graph.get(node, []):
+                if neighbor in in_stack:
+                    cycle = path[path.index(neighbor):] + [neighbor]
+                    self.warnings.append(
+                        f"Circular dependency detected: {' -> '.join(cycle)}"
+                    )
+                    return True
+                if neighbor not in visited:
+                    if dfs(neighbor, path + [neighbor]):
+                        return True
+            in_stack.discard(node)
+            return False
+
+        for task_id in graph:
+            if task_id not in visited:
+                dfs(task_id, [task_id])
 
     def _calculate_capacity(self, tasks: list[Task]) -> float:
         """Estimate capacity based on task hours."""

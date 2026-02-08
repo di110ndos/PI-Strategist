@@ -49,7 +49,22 @@ import {
 import { ResourceAllocationBar } from '../charts';
 import { exportSummaryPdf } from '../../utils/exportPdf';
 import { exportSummaryCsv } from '../../utils/exportCsv';
+import KPICard from '../common/KPICard';
 import type { ResourceData, AnalysisSummary } from '../../types';
+
+// ─── Discipline Color Map ───────────────────────────────────────
+
+const DISCIPLINE_COLORS: Record<string, string> = {
+  Engineering: 'blue',
+  QA: 'purple',
+  Design: 'orange',
+  PM: 'teal',
+  DevOps: 'cyan',
+};
+
+function getDisciplineColor(discipline: string): string {
+  return DISCIPLINE_COLORS[discipline] || 'gray';
+}
 
 // ─── Constants ─────────────────────────────────────────────────
 
@@ -292,22 +307,27 @@ export default function SummaryTab({ results, summary }: SummaryTabProps) {
 
       {/* Key Metrics Grid */}
       <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
-        <MetricCard
+        <KPICard
           label="Avg Utilization"
           value={`${formatNumber(avgAllocation)}%`}
           status={avgAllocation > 105 ? 'error' : avgAllocation < 80 ? 'warning' : 'success'}
-          helpText="Across all resources"
+          icon={TrendingUp}
+          helpText="Average allocation across all resources"
+          trend={avgAllocation > 105 ? 'up' : avgAllocation < 80 ? 'down' : 'stable'}
+          trendValue={avgAllocation > 105 ? 'Over-allocated' : avgAllocation < 80 ? 'Under-utilized' : 'Optimal'}
         />
-        <MetricCard
+        <KPICard
           label="Sprint Status"
           value={`${summary.capacity.passing}/${summary.capacity.total_sprints}`}
           status={summary.capacity.failing > 0 ? 'error' : 'success'}
+          icon={CheckCircle2}
           helpText={summary.capacity.failing > 0 ? `${summary.capacity.failing} overloaded` : 'All passing'}
         />
-        <MetricCard
+        <KPICard
           label="Resources"
           value={resourceCount}
           status="info"
+          icon={Users}
           helpText="Team members"
         />
         <MetricCard
@@ -612,11 +632,13 @@ function ExecutiveSummarySection({
                   const optimalCount = group.resources.filter(r => r.status === 'optimal').length;
 
                   return (
-                    <AccordionItem key={group.discipline}>
+                    <AccordionItem key={group.discipline} borderLeft="3px solid" borderLeftColor={`${getDisciplineColor(group.discipline)}.400`}>
                       <AccordionButton>
                         <Box flex="1" textAlign="left">
                           <HStack spacing={3}>
-                            <Text fontWeight="semibold">{group.discipline}</Text>
+                            <Badge colorScheme={getDisciplineColor(group.discipline)} variant="subtle" fontSize="xs">
+                              {group.discipline}
+                            </Badge>
                             <Badge>{group.count}</Badge>
                             <Text fontSize="sm" color="gray.500">
                               {formatNumber(group.totalHours)}h &middot; {formatCurrency(group.totalCost)}

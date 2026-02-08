@@ -162,16 +162,20 @@ async def run_full_analysis(
             if utilizations:
                 avg_utilization = sum(utilizations) / len(utilizations)
 
-        # Calculate CD eligible percentage
+        # Calculate CD eligible percentage using task hours (not cluster count)
         cd_eligible_percentage = 0.0
         if deployment_clusters:
-            feature_flag_count = sum(
-                1 for dc in deployment_clusters
+            eligible_task_hours = sum(
+                sum(t.hours for t in dc.tasks)
+                for dc in deployment_clusters
                 if dc.strategy == DeploymentStrategy.FEATURE_FLAG
             )
-            total_clusters = len(deployment_clusters)
-            if total_clusters > 0:
-                cd_eligible_percentage = (feature_flag_count / total_clusters) * 100
+            total_task_hours = sum(
+                sum(t.hours for t in dc.tasks)
+                for dc in deployment_clusters
+            )
+            if total_task_hours > 0:
+                cd_eligible_percentage = (eligible_task_hours / total_task_hours) * 100
 
         summary_data = {
             "risk": {

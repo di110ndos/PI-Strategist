@@ -33,9 +33,10 @@ import {
   useColorModeValue,
   useToast,
 } from '@chakra-ui/react';
-import { ClipboardList, TrendingUp, Rocket, BarChart3, Sparkles } from 'lucide-react';
+import { ClipboardList, TrendingUp, Rocket, BarChart3, Sparkles, Gauge, Users, AlertTriangle, DollarSign } from 'lucide-react';
 
 import FileUpload from '../components/common/FileUpload';
+import KPICard from '../components/common/KPICard';
 import CapacityTab from '../components/analysis/CapacityTab';
 import SummaryTab from '../components/analysis/SummaryTab';
 import AIInsightsTab from '../components/analysis/AIInsightsTab';
@@ -322,6 +323,54 @@ export default function AnalyzePage() {
             </Box>
           </Alert>
         )}
+
+        {/* KPI Summary Banner */}
+        {analysisResults && !isAnalyzing && (() => {
+          const cap = analysisResults.summary.capacity;
+          const piRes = (analysisResults.results as any).pi_analysis?.resources || {};
+          const resourceCount = Object.keys(piRes).length;
+          const totalCapacity = (analysisResults.results as any).pi_analysis?.total_capacity || resourceCount * 488;
+          const totalAllocated = (analysisResults.results as any).pi_analysis?.total_allocated ||
+            Object.values(piRes).reduce((sum: number, r: any) => sum + (r.total_hours || 0), 0);
+          const utilPct = totalCapacity > 0 ? (totalAllocated / totalCapacity) * 100 : 0;
+          const totalCost = Object.values(piRes).reduce(
+            (sum: number, r: any) => sum + (r.total_hours || 0) * (r.rate || 0), 0
+          );
+          const utilStatus = utilPct > 105 ? 'error' as const : utilPct < 80 ? 'warning' as const : 'success' as const;
+
+          return (
+            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+              <KPICard
+                label="Overall Utilization"
+                value={`${utilPct.toFixed(1)}%`}
+                status={utilStatus}
+                icon={Gauge}
+                helpText="Total allocated hours vs total capacity"
+              />
+              <KPICard
+                label="Sprints Overloaded"
+                value={cap.failing}
+                status={cap.failing > 0 ? 'error' : 'success'}
+                icon={AlertTriangle}
+                helpText={`${cap.passing} of ${cap.total_sprints} sprints passing`}
+              />
+              <KPICard
+                label="Resources"
+                value={resourceCount}
+                status="info"
+                icon={Users}
+                helpText="Total team members in this PI"
+              />
+              <KPICard
+                label="Total Cost"
+                value={totalCost > 0 ? `$${Math.round(totalCost).toLocaleString()}` : 'N/A'}
+                status={totalCost > 0 ? 'info' : 'warning'}
+                icon={DollarSign}
+                helpText="Sum of hours x rate for all resources"
+              />
+            </SimpleGrid>
+          );
+        })()}
 
         {/* Results */}
         {analysisResults && !isAnalyzing && (

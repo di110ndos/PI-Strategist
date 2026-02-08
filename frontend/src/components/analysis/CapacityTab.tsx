@@ -192,12 +192,60 @@ function SprintCard({ analysis }: { analysis: SprintAnalysis }) {
         <VStack align="stretch" spacing={4}>
           {/* Header */}
           <HStack justify="space-between">
-            <Text fontWeight="bold" fontSize="lg">
-              {sprint.name}
-            </Text>
-            <Badge colorScheme={isPassing ? 'green' : 'red'} fontSize="sm">
-              {isPassing ? 'PASS' : 'FAIL'}
-            </Badge>
+            <HStack spacing={2}>
+              <Box
+                w="10px"
+                h="10px"
+                borderRadius="full"
+                bg={
+                  utilization_percent > 105
+                    ? 'red.500'
+                    : utilization_percent > 100
+                    ? 'orange.400'
+                    : utilization_percent >= 80
+                    ? 'yellow.400'
+                    : 'green.400'
+                }
+                boxShadow={
+                  utilization_percent > 105
+                    ? '0 0 6px rgba(239,68,68,0.6)'
+                    : utilization_percent > 100
+                    ? '0 0 6px rgba(251,146,60,0.5)'
+                    : utilization_percent >= 80
+                    ? '0 0 6px rgba(250,204,21,0.4)'
+                    : '0 0 6px rgba(74,222,128,0.4)'
+                }
+              />
+              <Text fontWeight="bold" fontSize="lg">
+                {sprint.name}
+              </Text>
+            </HStack>
+            <HStack spacing={2}>
+              <Badge
+                colorScheme={
+                  utilization_percent > 105
+                    ? 'red'
+                    : utilization_percent > 100
+                    ? 'orange'
+                    : utilization_percent >= 80
+                    ? 'yellow'
+                    : 'green'
+                }
+                variant="subtle"
+                fontSize="xs"
+              >
+                {utilization_percent > 105
+                  ? 'Over'
+                  : utilization_percent > 100
+                  ? 'Near Limit'
+                  : utilization_percent >= 80
+                  ? 'High'
+                  : 'Healthy'}
+              </Badge>
+              <Badge colorScheme={isPassing ? 'green' : 'red'} fontSize="sm">
+                {isPassing ? 'PASS' : 'FAIL'}
+              </Badge>
+            </HStack>
           </HStack>
 
           {/* Progress Bar */}

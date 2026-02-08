@@ -44,6 +44,8 @@ class CapacityAnalyzer:
         Args:
             default_buffer: Default buffer percentage (0.20 = 20%)
         """
+        if not 0 <= default_buffer < 1:
+            raise ValueError("Buffer percentage must be between 0 and 1")
         self.default_buffer = default_buffer
 
     def analyze(
@@ -147,7 +149,7 @@ class CapacityAnalyzer:
         high_risk_ids = {t.id for t in high_risk_tasks}
         movable_tasks = sorted(
             [t for t in sprint.tasks if t.id not in high_risk_ids],
-            key=lambda t: -t.hours,  # Highest hours first
+            key=lambda t: (not getattr(t, 'is_high_risk', False), -t.hours),
         )
 
         # Find target sprints with capacity

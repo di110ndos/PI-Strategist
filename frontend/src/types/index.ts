@@ -188,3 +188,42 @@ export interface AIInsightsResponse {
   key_metrics_commentary: string;
   rebalancing_suggestions: RebalancingSuggestion[];
 }
+
+// ─── PI Objectives Types ──────────────────────────────────────
+
+export interface PIObjective {
+  objective_id: string;
+  name: string;
+  description: string;
+  objective_type: 'committed' | 'stretch';
+  business_value: number;
+  status: 'planned' | 'in_progress' | 'completed' | 'at_risk';
+  acceptance_criteria: string;
+  linked_stories: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Risk Register Types ──────────────────────────────────────
+
+export interface Risk {
+  risk_id: string;
+  title: string;
+  description: string;
+  category: 'technical' | 'resource' | 'schedule' | 'scope' | 'external' | 'general';
+  probability: number;
+  impact: number;
+  risk_score: number;
+  owner: string;
+  mitigation_plan: string;
+  status: 'open' | 'mitigating' | 'mitigated' | 'accepted' | 'closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RiskSummary {
+  total: number;
+  by_status: Record<string, number>;
+  average_score: number;
+  heat_map: number[][];
+}

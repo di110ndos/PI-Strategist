@@ -14,6 +14,8 @@ import QuickCheckPage from './pages/QuickCheckPage';
 import AnalyzePage from './pages/AnalyzePage';
 import ScenariosPage from './pages/ScenariosPage';
 import ComparePage from './pages/ComparePage';
+import ObjectivesPage from './pages/ObjectivesPage';
+import RiskRegisterPage from './pages/RiskRegisterPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Create a client for React Query
@@ -70,6 +72,8 @@ function App() {
                   <Route path="/ded" element={<QuickCheckPage />} />
                   <Route path="/quick-check" element={<Navigate to="/ded" replace />} />
                   <Route path="/scenarios" element={<ScenariosPage />} />
+                  <Route path="/objectives" element={<ObjectivesPage />} />
+                  <Route path="/risks" element={<RiskRegisterPage />} />
                   <Route path="/compare" element={<ComparePage />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>

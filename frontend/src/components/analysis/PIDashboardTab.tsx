@@ -105,6 +105,13 @@ interface PIDashboardTabProps {
   summary: AnalysisSummary;
 }
 
+function getScoreStatus(score: number): { label: string; color: string } {
+  if (score >= 80) return { label: 'Healthy', color: 'green.500' };
+  if (score >= 60) return { label: 'Moderate', color: 'yellow.600' };
+  if (score >= 40) return { label: 'At Risk', color: 'orange.500' };
+  return { label: 'Critical', color: 'red.500' };
+}
+
 function HealthScoreCard({ score, label, icon, tooltip, colorScheme: cs }: { score: number; label: string; icon: any; tooltip: string; colorScheme?: string }) {
   const getColorScheme = (s: number) => {
     if (s >= 80) return 'green';
@@ -115,6 +122,7 @@ function HealthScoreCard({ score, label, icon, tooltip, colorScheme: cs }: { sco
 
   const colorScheme = cs || getColorScheme(score);
   const cardBg = useColorModeValue('white', 'gray.800');
+  const statusInfo = getScoreStatus(score);
 
   return (
     <Tooltip label={tooltip} fontSize="sm" placement="top" hasArrow maxW="280px">
@@ -137,6 +145,9 @@ function HealthScoreCard({ score, label, icon, tooltip, colorScheme: cs }: { sco
               {label}
             </Text>
           </HStack>
+          <Text fontSize="xs" fontWeight="bold" color={statusInfo.color} mt={1}>
+            {statusInfo.label}
+          </Text>
         </CardBody>
       </Card>
     </Tooltip>
@@ -326,19 +337,33 @@ export default function PIDashboardTab({ results, summary }: PIDashboardTabProps
 
       {/* Allocation Distribution + Top Projects */}
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
-        {piResources && Object.keys(piResources).length > 0 && (
-          <Card bg={cardBg}>
-            <CardHeader pb={2}>
-              <HStack>
-                <Icon as={BarChart3} boxSize={5} color="cyan.500" />
-                <Heading size="sm">Allocation Distribution</Heading>
-              </HStack>
-            </CardHeader>
-            <CardBody pt={0}>
-              <AllocationDistribution resources={piResources} />
-            </CardBody>
-          </Card>
-        )}
+        {piResources && Object.keys(piResources).length > 0 && (() => {
+          const resArr = Object.values(piResources);
+          const total = resArr.length;
+          const optimalCount = resArr.filter((r) => {
+            const maxHrs = 488;
+            const pct = maxHrs > 0 ? (r.total_hours / maxHrs) * 100 : 0;
+            return pct >= 80 && pct <= 105;
+          }).length;
+          const optimalPct = total > 0 ? ((optimalCount / total) * 100).toFixed(0) : '0';
+
+          return (
+            <Card bg={cardBg}>
+              <CardHeader pb={2}>
+                <HStack>
+                  <Icon as={BarChart3} boxSize={5} color="cyan.500" />
+                  <Heading size="sm">Allocation Distribution</Heading>
+                </HStack>
+              </CardHeader>
+              <CardBody pt={0}>
+                <AllocationDistribution resources={piResources} />
+                <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
+                  {optimalPct}% of resources within optimal range (80-105%)
+                </Text>
+              </CardBody>
+            </Card>
+          );
+        })()}
         {piProjects && Object.keys(piProjects).length > 0 && (
           <Card bg={cardBg}>
             <CardHeader pb={2}>

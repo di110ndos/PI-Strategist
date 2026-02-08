@@ -15,3 +15,4 @@ export { default as AllocationDistribution } from './AllocationDistribution';
 export { default as DeploymentReadinessGauge } from './DeploymentReadinessGauge';
 export { default as ProjectTimeline } from './ProjectTimeline';
 export { default as ResourceAllocationBar } from './ResourceAllocationBar';
+export { default as RiskHeatMap } from './RiskHeatMap';

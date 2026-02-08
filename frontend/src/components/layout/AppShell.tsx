@@ -27,6 +27,8 @@ import {
   Home,
   Sun,
   Moon,
+  Target,
+  ShieldAlert,
 } from 'lucide-react';
 import NavLink from './NavLink';
 import type { ReactNode } from 'react';
@@ -36,6 +38,8 @@ const NAV_ITEMS = [
   { to: '/analyze', label: 'Analyze', icon: <BarChart3 size={16} /> },
   { to: '/ded', label: 'DED', icon: <FileText size={16} /> },
   { to: '/scenarios', label: 'Scenarios', icon: <FlaskConical size={16} /> },
+  { to: '/objectives', label: 'Objectives', icon: <Target size={16} /> },
+  { to: '/risks', label: 'Risk Register', icon: <ShieldAlert size={16} /> },
   { to: '/compare', label: 'Compare', icon: <TrendingUp size={16} /> },
 ];
 

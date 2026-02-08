@@ -35,10 +35,14 @@ import {
   AccordionPanel,
   AccordionIcon,
   Spinner,
+  Icon,
   useColorModeValue,
 } from '@chakra-ui/react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSavedAnalyses, useSavedAnalysis } from '../hooks/useAnalysis';
+import { LazyPlot } from '../components/charts';
+import { plotlyLayout, PLOTLY_CONFIG, BLUE, TEXT_MUTED } from '../components/charts/plotlyDefaults';
 import type { AnalysisResponse } from '../types';
 
 // ─── Types ──────────────────────────────────────────────────────
@@ -263,6 +267,19 @@ function ComparisonView({ fullA, fullB, labelA, labelB, cardBg }: ComparisonView
   const deltaCost = piB.totalCost - piA.totalCost;
   const deltaResources = piB.resourceCount - piA.resourceCount;
 
+  // Determine trend arrow logic per metric:
+  // Hours: more hours = neutral (not inherently good/bad), show gray
+  // Utilization: moving toward 80-100% is good, moving away is bad
+  // Cost: lower cost is good (green down), higher cost is bad (red up)
+  const hoursIsUp = deltaHours >= 0;
+  const utilIsUp = deltaUtil >= 0;
+  const costIsUp = deltaCost >= 0;
+
+  // Utilization improvement: closer to 80-100% optimal range
+  const baseOptimalDist = Math.abs(piA.utilization - 90);
+  const currOptimalDist = Math.abs(piB.utilization - 90);
+  const utilImproved = currOptimalDist < baseOptimalDist;
+
   return (
     <VStack spacing={6} align="stretch">
       {/* Key Metrics */}
@@ -276,21 +293,42 @@ function ComparisonView({ fullA, fullB, labelA, labelB, cardBg }: ComparisonView
               <StatLabel>Allocated Hours</StatLabel>
               <StatNumber>{piB.totalAllocated.toLocaleString()}h</StatNumber>
               <StatHelpText color={deltaHours >= 0 ? 'green.500' : 'red.500'}>
-                {deltaHours >= 0 ? '+' : ''}{deltaHours.toLocaleString()}h
+                <HStack spacing={1} display="inline-flex" alignItems="center">
+                  <Icon
+                    as={hoursIsUp ? TrendingUp : TrendingDown}
+                    boxSize={3.5}
+                    color={deltaHours >= 0 ? 'green.500' : 'red.500'}
+                  />
+                  <Text as="span">{deltaHours >= 0 ? '+' : ''}{deltaHours.toLocaleString()}h</Text>
+                </HStack>
               </StatHelpText>
             </Stat>
             <Stat>
               <StatLabel>Utilization</StatLabel>
               <StatNumber>{piB.utilization.toFixed(1)}%</StatNumber>
-              <StatHelpText color={deltaUtil > 10 ? 'orange.500' : deltaUtil >= 0 ? 'green.500' : 'blue.500'}>
-                {deltaUtil >= 0 ? '+' : ''}{deltaUtil.toFixed(1)}%
+              <StatHelpText color={utilImproved ? 'green.500' : 'orange.500'}>
+                <HStack spacing={1} display="inline-flex" alignItems="center">
+                  <Icon
+                    as={utilIsUp ? TrendingUp : TrendingDown}
+                    boxSize={3.5}
+                    color={utilImproved ? 'green.500' : 'orange.500'}
+                  />
+                  <Text as="span">{deltaUtil >= 0 ? '+' : ''}{deltaUtil.toFixed(1)}%</Text>
+                </HStack>
               </StatHelpText>
             </Stat>
             <Stat>
               <StatLabel>Total Cost</StatLabel>
               <StatNumber>${piB.totalCost.toLocaleString()}</StatNumber>
-              <StatHelpText color={deltaCost > 0 ? 'red.500' : 'green.500'}>
-                {deltaCost >= 0 ? '+' : ''}${deltaCost.toLocaleString()}
+              <StatHelpText color={costIsUp ? 'red.500' : 'green.500'}>
+                <HStack spacing={1} display="inline-flex" alignItems="center">
+                  <Icon
+                    as={costIsUp ? TrendingUp : TrendingDown}
+                    boxSize={3.5}
+                    color={costIsUp ? 'red.500' : 'green.500'}
+                  />
+                  <Text as="span">{deltaCost >= 0 ? '+' : ''}${deltaCost.toLocaleString()}</Text>
+                </HStack>
               </StatHelpText>
             </Stat>
             <Stat>
@@ -298,13 +336,70 @@ function ComparisonView({ fullA, fullB, labelA, labelB, cardBg }: ComparisonView
               <StatNumber>{piB.resourceCount}</StatNumber>
               {deltaResources !== 0 && (
                 <StatHelpText>
-                  {deltaResources > 0 ? '+' : ''}{deltaResources}
+                  <HStack spacing={1} display="inline-flex" alignItems="center">
+                    <Icon
+                      as={deltaResources > 0 ? TrendingUp : TrendingDown}
+                      boxSize={3.5}
+                    />
+                    <Text as="span">{deltaResources > 0 ? '+' : ''}{deltaResources}</Text>
+                  </HStack>
                 </StatHelpText>
               )}
             </Stat>
           </StatGroup>
         </CardBody>
       </Card>
+
+      {/* Delta Visualization Chart */}
+      {(piA.totalAllocated > 0 || piB.totalAllocated > 0) && (
+        <Card bg={cardBg}>
+          <CardHeader pb={2}>
+            <Text fontWeight="bold" fontSize="lg">Baseline vs Current</Text>
+          </CardHeader>
+          <CardBody pt={0}>
+            <LazyPlot
+              data={[
+                {
+                  type: 'bar',
+                  name: labelA,
+                  x: ['Total Hours', 'Total Cost ($)', 'Utilization (%)'],
+                  y: [piA.totalAllocated, piA.totalCost, piA.utilization],
+                  marker: { color: TEXT_MUTED },
+                  text: [
+                    `${piA.totalAllocated.toLocaleString()}h`,
+                    `$${piA.totalCost.toLocaleString()}`,
+                    `${piA.utilization.toFixed(1)}%`,
+                  ],
+                  textposition: 'outside',
+                },
+                {
+                  type: 'bar',
+                  name: labelB,
+                  x: ['Total Hours', 'Total Cost ($)', 'Utilization (%)'],
+                  y: [piB.totalAllocated, piB.totalCost, piB.utilization],
+                  marker: { color: BLUE },
+                  text: [
+                    `${piB.totalAllocated.toLocaleString()}h`,
+                    `$${piB.totalCost.toLocaleString()}`,
+                    `${piB.utilization.toFixed(1)}%`,
+                  ],
+                  textposition: 'outside',
+                },
+              ]}
+              layout={plotlyLayout({
+                barmode: 'group',
+                height: 300,
+                yaxis: { title: { text: 'Value' }, gridcolor: '#2a2a30', zerolinecolor: '#35353d' },
+                xaxis: { gridcolor: '#2a2a30', zerolinecolor: '#35353d' },
+                legend: { orientation: 'h', y: 1.15, x: 0.5, xanchor: 'center', bgcolor: 'rgba(0,0,0,0)', bordercolor: '#2a2a30', font: { color: TEXT_MUTED } },
+                margin: { l: 60, r: 40, t: 50, b: 40 },
+              })}
+              config={PLOTLY_CONFIG}
+              style={{ width: '100%', height: '300px' }}
+            />
+          </CardBody>
+        </Card>
+      )}
 
       {/* Side-by-Side */}
       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>

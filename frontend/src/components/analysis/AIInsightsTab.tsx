@@ -16,6 +16,7 @@ import {
   Badge,
   Icon,
   useColorModeValue,
+  useToast,
   Alert,
   AlertIcon,
   AlertTitle,
@@ -34,6 +35,7 @@ import {
   InputRightElement,
   IconButton,
   Divider,
+  Tooltip,
 } from '@chakra-ui/react';
 import {
   Sparkles,
@@ -43,6 +45,7 @@ import {
   ArrowRightLeft,
   Send,
   MessageCircle,
+  Copy,
 } from 'lucide-react';
 import { useAIInsights, useRebalancing, useAIChat } from '../../hooks/useAnalysis';
 import type { AIInsightsResponse, AIRecommendation, ResourceData, RebalancingSuggestion, ChatMessage } from '../../types';
@@ -67,8 +70,21 @@ const CATEGORY_COLORS: Record<string, string> = {
   capacity: 'teal', risk: 'red', cost: 'green', resource: 'purple', general: 'gray',
 };
 
+const QUICK_QUESTIONS = [
+  'What are the top risks?',
+  'Which sprints need attention?',
+  'How can we reduce costs?',
+  'Summarize key actions',
+];
+
+const FOLLOW_UP_SUGGESTIONS = [
+  'Tell me more',
+  'What else should I know?',
+];
+
 export default function AIInsightsTab({ results }: AIInsightsTabProps) {
   const cardBg = useColorModeValue('white', 'gray.800');
+  const toast = useToast();
   const [insights, setInsights] = useState<AIInsightsResponse | null>(null);
   const mutation = useAIInsights();
 
@@ -160,6 +176,54 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
     );
   }, [chatInput, chatMutation, insights, results]);
 
+  // ─── Quick-action: set input and auto-send ────────────────
+  const handleQuickAction = useCallback((question: string) => {
+    if (chatMutation.isPending) return;
+    setChatInput(question);
+    // Directly send (we can't rely on chatInput state being set yet, so inline it)
+    const userMsg: ChatMessage = { role: 'user', content: question };
+    const historyBeforeThisMessage = [...chatHistoryRef.current];
+    chatHistoryRef.current = [...chatHistoryRef.current, userMsg];
+    setChatHistory(chatHistoryRef.current);
+    setChatInput('');
+
+    chatMutation.mutate(
+      {
+        question,
+        pi_analysis: (results.pi_analysis || {}) as Record<string, unknown>,
+        capacity_plan: (results.capacity_plan as Record<string, unknown>) || null,
+        previous_insights: insights,
+        conversation_history: historyBeforeThisMessage,
+      },
+      {
+        onSuccess: (data) => {
+          const assistantMsg: ChatMessage = { role: 'assistant', content: data.answer };
+          chatHistoryRef.current = [...chatHistoryRef.current, assistantMsg];
+          setChatHistory(chatHistoryRef.current);
+          setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        },
+        onError: (err) => {
+          const errorMsg: ChatMessage = { role: 'assistant', content: `Sorry, I couldn't process that: ${err.message}` };
+          chatHistoryRef.current = [...chatHistoryRef.current, errorMsg];
+          setChatHistory(chatHistoryRef.current);
+        },
+      }
+    );
+  }, [chatMutation, insights, results]);
+
+  // ─── Copy to clipboard helper ─────────────────────────────
+  const handleCopyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        title: 'Copied to clipboard',
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+        position: 'bottom-right',
+      });
+    });
+  }, [toast]);
+
   // ─── Filtered Recommendations ───────────────────────────────
   const recs = insights?.recommendations ?? [];
   const filteredRecs = recs.filter((rec) => {
@@ -242,8 +306,24 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
               {insights.executive_summary && (
                 <Box>
                   <Text fontWeight="semibold" fontSize="sm" mb={2}>Executive Summary</Text>
-                  <Box bg="purple.50" _dark={{ bg: 'purple.900' }} p={4} borderRadius="md" borderLeft="4px solid" borderLeftColor="purple.400">
-                    <Text fontSize="sm" whiteSpace="pre-wrap">{insights.executive_summary}</Text>
+                  <Box position="relative" bg="purple.50" _dark={{ bg: 'purple.900' }} p={4} pr={10} borderRadius="md" borderLeft="4px solid" borderLeftColor="purple.400">
+                    <Tooltip label="Copy to clipboard" placement="top" hasArrow>
+                      <IconButton
+                        aria-label="Copy executive summary"
+                        icon={<Icon as={Copy} boxSize={3.5} />}
+                        size="xs"
+                        variant="ghost"
+                        position="absolute"
+                        top={2}
+                        right={2}
+                        onClick={() => handleCopyToClipboard(insights.executive_summary)}
+                      />
+                    </Tooltip>
+                    {insights.executive_summary.split('\n\n').map((paragraph, i) => (
+                      <Text key={i} fontSize="sm" mb={i < insights.executive_summary.split('\n\n').length - 1 ? 3 : 0}>
+                        {paragraph}
+                      </Text>
+                    ))}
                   </Box>
                 </Box>
               )}
@@ -317,9 +397,21 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
               {insights.risk_assessment && (
                 <Box>
                   <Text fontWeight="semibold" fontSize="sm" mb={2}>Risk Assessment</Text>
-                  <Alert status="info" borderRadius="md" variant="left-accent">
+                  <Alert status="info" borderRadius="md" variant="left-accent" position="relative" pr={10}>
                     <AlertIcon />
                     <Text fontSize="sm" whiteSpace="pre-wrap">{insights.risk_assessment}</Text>
+                    <Tooltip label="Copy to clipboard" placement="top" hasArrow>
+                      <IconButton
+                        aria-label="Copy risk assessment"
+                        icon={<Icon as={Copy} boxSize={3.5} />}
+                        size="xs"
+                        variant="ghost"
+                        position="absolute"
+                        top={2}
+                        right={2}
+                        onClick={() => handleCopyToClipboard(insights.risk_assessment)}
+                      />
+                    </Tooltip>
                   </Alert>
                 </Box>
               )}
@@ -435,7 +527,26 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
             {chatHistory.length > 0 && (
               <VStack spacing={3} align="stretch" mb={4} maxH="400px" overflowY="auto">
                 {chatHistory.map((msg, i) => (
-                  <ChatBubble key={i} message={msg} />
+                  <Box key={i}>
+                    <ChatBubble message={msg} />
+                    {/* Follow-up suggestion buttons after the most recent assistant message */}
+                    {msg.role === 'assistant' && i === chatHistory.length - 1 && !chatMutation.isPending && (
+                      <Wrap spacing={2} mt={2}>
+                        {FOLLOW_UP_SUGGESTIONS.map((suggestion) => (
+                          <WrapItem key={suggestion}>
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              colorScheme="gray"
+                              onClick={() => handleQuickAction(suggestion)}
+                            >
+                              {suggestion}
+                            </Button>
+                          </WrapItem>
+                        ))}
+                      </Wrap>
+                    )}
+                  </Box>
                 ))}
                 {chatMutation.isPending && (
                   <HStack spacing={2} alignSelf="flex-start">
@@ -448,6 +559,25 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
             )}
 
             {chatHistory.length > 0 && <Divider mb={3} />}
+
+            {/* Quick-action suggestion buttons (shown only when chat is empty) */}
+            {chatHistory.length === 0 && (
+              <Wrap spacing={2} mb={3}>
+                {QUICK_QUESTIONS.map((question) => (
+                  <WrapItem key={question}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      colorScheme="green"
+                      onClick={() => handleQuickAction(question)}
+                      isDisabled={chatMutation.isPending}
+                    >
+                      {question}
+                    </Button>
+                  </WrapItem>
+                ))}
+              </Wrap>
+            )}
 
             {/* Chat input */}
             <InputGroup size="md">
@@ -529,6 +659,26 @@ function RecommendationCard({ rec }: { rec: AIRecommendation }) {
                 {rec.impact}
               </Text>
             </HStack>
+          )}
+
+          {/* Affected resources & sprints */}
+          {(rec.affected_resources.length > 0 || rec.affected_sprints.length > 0) && (
+            <Wrap spacing={1} pt={1}>
+              {rec.affected_resources.map((resource) => (
+                <WrapItem key={`res-${resource}`}>
+                  <Tag size="sm" colorScheme="purple" variant="subtle">
+                    <TagLabel>{resource}</TagLabel>
+                  </Tag>
+                </WrapItem>
+              ))}
+              {rec.affected_sprints.map((sprint) => (
+                <WrapItem key={`spr-${sprint}`}>
+                  <Tag size="sm" colorScheme="blue" variant="subtle">
+                    <TagLabel>{sprint}</TagLabel>
+                  </Tag>
+                </WrapItem>
+              ))}
+            </Wrap>
           )}
         </VStack>
       </CardBody>

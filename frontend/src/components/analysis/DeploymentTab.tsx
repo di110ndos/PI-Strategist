@@ -56,6 +56,30 @@ const strategyIcons: Record<string, typeof Flag> = {
   blue_green: RefreshCw,
 };
 
+/** Determine deployment readiness for a cluster based on its attributes. */
+function clusterReadiness(cluster: DeploymentCluster): {
+  label: string;
+  colorScheme: string;
+} {
+  const hasRollback = !!cluster.rollback_plan;
+  const hasTiming = !!cluster.deploy_timing;
+  const hasDeps = cluster.dependencies && cluster.dependencies.length > 0;
+  const isFeatureFlag = cluster.strategy === 'feature_flag';
+
+  // Feature flags with rollback plans are highly ready
+  if (isFeatureFlag && hasRollback) return { label: 'Ready', colorScheme: 'green' };
+  // Feature flags without rollback are mostly ready
+  if (isFeatureFlag) return { label: 'Mostly Ready', colorScheme: 'teal' };
+  // Has rollback and timing — good to go
+  if (hasRollback && hasTiming) return { label: 'Ready', colorScheme: 'green' };
+  // Has rollback OR timing but not both
+  if (hasRollback || hasTiming) return { label: 'Partial', colorScheme: 'yellow' };
+  // Has unresolved dependencies and no safety net
+  if (hasDeps) return { label: 'At Risk', colorScheme: 'red' };
+  // Default — needs review
+  return { label: 'Needs Review', colorScheme: 'orange' };
+}
+
 export default function DeploymentTab({ deploymentClusters }: DeploymentTabProps) {
   const cardBg = useColorModeValue('white', 'gray.800');
 
@@ -160,6 +184,7 @@ export default function DeploymentTab({ deploymentClusters }: DeploymentTabProps
       <Accordion allowMultiple>
         {deploymentClusters.map((cluster, idx) => {
           const StratIcon = strategyIcons[cluster.strategy] || Rocket;
+          const readiness = clusterReadiness(cluster);
           return (
             <AccordionItem key={idx} border="none" mb={2}>
               <AccordionButton
@@ -168,13 +193,16 @@ export default function DeploymentTab({ deploymentClusters }: DeploymentTabProps
                 _hover={{ bg: useColorModeValue('gray.200', 'gray.600') }}
               >
                 <Box flex="1" textAlign="left">
-                  <HStack>
+                  <HStack flexWrap="wrap">
                     <Icon as={StratIcon} boxSize={5} />
                     <Text fontWeight="bold">{cluster.name}</Text>
                     <Badge colorScheme={strategyColors[cluster.strategy] || 'gray'}>
                       {(cluster.strategy || 'unknown').replace('_', ' ')}
                     </Badge>
                     <Badge variant="outline">{cluster.tasks.length} tasks</Badge>
+                    <Badge colorScheme={readiness.colorScheme} variant="solid" fontSize="xs">
+                      {readiness.label}
+                    </Badge>
                   </HStack>
                 </Box>
                 <AccordionIcon />

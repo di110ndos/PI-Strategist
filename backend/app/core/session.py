@@ -116,6 +116,12 @@ async def cleanup_expired_sessions(ttl_hours: int | None = None) -> int:
             f"DELETE FROM analyses WHERE session_id IN ({placeholders})", expired
         )
         await db.execute(
+            f"DELETE FROM objectives WHERE session_id IN ({placeholders})", expired
+        )
+        await db.execute(
+            f"DELETE FROM risks WHERE session_id IN ({placeholders})", expired
+        )
+        await db.execute(
             f"DELETE FROM sessions WHERE session_id IN ({placeholders})", expired
         )
         await db.commit()

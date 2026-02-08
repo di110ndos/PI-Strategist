@@ -209,6 +209,7 @@ class CapacityPlan:
 
     filename: str
     sprints: list[Sprint] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def all_tasks(self) -> list[Task]:
