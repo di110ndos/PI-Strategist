@@ -17,11 +17,12 @@ export interface SavedAnalysis {
   name: string;
   year: string;
   quarter: string;
-  created_at: string;
-  summary: {
-    risk: { total: number; critical: number };
-    capacity: { total_sprints: number; passing: number };
-  };
+  saved_at: string;
+  summary?: {
+    risk?: { total: number; high: number; medium: number; low: number };
+    capacity?: { total_sprints: number; passing: number; failing: number; average_utilization: number };
+    deployment?: { total_clusters: number; cd_eligible_percentage: number };
+  } | null;
 }
 
 export const analysisApi = {

@@ -137,7 +137,7 @@ export default function AIInsightsTab({ results }: AIInsightsTabProps) {
         pi_analysis: (results.pi_analysis || {}) as Record<string, unknown>,
         capacity_plan: (results.capacity_plan as Record<string, unknown>) || null,
         previous_insights: insights,
-        conversation_history: [...chatHistory, userMsg],
+        conversation_history: chatHistory,
       },
       {
         onSuccess: (data) => {

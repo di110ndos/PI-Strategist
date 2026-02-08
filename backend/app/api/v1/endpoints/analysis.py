@@ -1,22 +1,61 @@
 """Full analysis endpoint."""
 
+import json
 import sys
 import uuid
+from dataclasses import fields
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from enum import Enum
+from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-# Add the src directory to the path
-src_path = Path(__file__).parent.parent.parent.parent.parent / "src"
-sys.path.insert(0, str(src_path))
+# Ensure src/ is importable (editable install preferred: `pip install -e .`)
+src_path = str(Path(__file__).parent.parent.parent.parent.parent / "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 from app.core.file_storage import file_storage
+from app.core.database import get_db
 from app.models.responses import AnalysisResponse, AnalysisSummary
 
 router = APIRouter()
+saved_router = APIRouter()
+
+
+def serialize(obj):
+    """Recursively serialize dataclasses, enums, and other types to JSON-safe dicts."""
+    if obj is None:
+        return None
+    if isinstance(obj, Enum):
+        return obj.value
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, (Path,)):
+        return str(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, tuple):
+        return [serialize(item) for item in obj]
+    if isinstance(obj, list):
+        return [serialize(item) for item in obj]
+    if isinstance(obj, dict):
+        return {str(k): serialize(v) for k, v in obj.items()}
+    if hasattr(obj, "__dataclass_fields__"):
+        # Dataclass: serialize declared fields + @property values
+        result = {f.name: serialize(getattr(obj, f.name)) for f in fields(obj)}
+        for attr_name in dir(obj.__class__):
+            if isinstance(getattr(obj.__class__, attr_name, None), property):
+                try:
+                    result[attr_name] = serialize(getattr(obj, attr_name))
+                except Exception:
+                    pass
+        return result
+    if hasattr(obj, "__dict__"):
+        return {k: serialize(v) for k, v in obj.__dict__.items()}
+    return str(obj)
 
 
 class AnalysisRequest(BaseModel):
@@ -43,12 +82,12 @@ async def run_full_analysis(request: AnalysisRequest):
     excel_path = None
 
     if request.ded_file_id:
-        ded_path = file_storage.get_path(request.ded_file_id)
+        ded_path = await file_storage.get_path(request.ded_file_id)
         if not ded_path:
             raise HTTPException(status_code=404, detail="DED file not found")
 
     if request.excel_file_id:
-        excel_path = file_storage.get_path(request.excel_file_id)
+        excel_path = await file_storage.get_path(request.excel_file_id)
         if not excel_path:
             raise HTTPException(status_code=404, detail="Excel file not found")
 
@@ -59,12 +98,13 @@ async def run_full_analysis(request: AnalysisRequest):
         from pi_strategist.analyzers.risk_analyzer import RiskAnalyzer
         from pi_strategist.analyzers.capacity_analyzer import CapacityAnalyzer
         from pi_strategist.analyzers.deployment_analyzer import DeploymentAnalyzer
+        from pi_strategist.models import DeploymentStrategy
 
         # Initialize
         ded_parser = DEDParser()
-        pi_parser = PIPlannerParser()
+        pi_parser = PIPlannerParser(default_buffer=request.buffer_percentage)
         risk_analyzer = RiskAnalyzer()
-        capacity_analyzer = CapacityAnalyzer()
+        capacity_analyzer = CapacityAnalyzer(default_buffer=request.buffer_percentage)
         deployment_analyzer = DeploymentAnalyzer()
 
         # Parse files
@@ -75,9 +115,7 @@ async def run_full_analysis(request: AnalysisRequest):
         capacity_plan = None
         pi_analysis = None
         if excel_path:
-            pi_parser.default_buffer = request.buffer_percentage
-            capacity_plan = pi_parser.parse(excel_path)
-            pi_analysis = pi_parser.last_pi_analysis
+            capacity_plan, pi_analysis = pi_parser.parse_with_analysis(excel_path)
 
         # Run analyzers
         red_flags = []
@@ -86,7 +124,6 @@ async def run_full_analysis(request: AnalysisRequest):
 
         capacity_analysis = []
         if capacity_plan:
-            capacity_analyzer.default_buffer = request.buffer_percentage
             capacity_analysis = capacity_analyzer.analyze(capacity_plan, red_flags)
 
         deployment_clusters = []
@@ -97,23 +134,10 @@ async def run_full_analysis(request: AnalysisRequest):
         # Build response
         analysis_id = str(uuid.uuid4())
 
-        # Serialize results (convert dataclasses to dicts)
-        def serialize(obj):
-            if hasattr(obj, "__dict__"):
-                return {k: serialize(v) for k, v in obj.__dict__.items()}
-            elif isinstance(obj, list):
-                return [serialize(item) for item in obj]
-            elif isinstance(obj, dict):
-                return {k: serialize(v) for k, v in obj.items()}
-            elif hasattr(obj, "value"):  # Enum
-                return obj.value
-            else:
-                return obj
-
         results = {
-            "ded": serialize(ded) if ded else None,
-            "capacity_plan": serialize(capacity_plan) if capacity_plan else None,
-            "pi_analysis": serialize(pi_analysis) if pi_analysis else None,
+            "ded": serialize(ded),
+            "capacity_plan": serialize(capacity_plan),
+            "pi_analysis": serialize(pi_analysis),
             "red_flags": serialize(red_flags),
             "capacity_analysis": serialize(capacity_analysis),
             "deployment_clusters": serialize(deployment_clusters),
@@ -127,22 +151,55 @@ async def run_full_analysis(request: AnalysisRequest):
         passing_sprints = len([ca for ca in capacity_analysis if ca.status.value == "pass"])
         failing_sprints = len([ca for ca in capacity_analysis if ca.status.value == "fail"])
 
-        summary = AnalysisSummary(
-            risk={
+        # Calculate average utilization
+        avg_utilization = 0.0
+        if capacity_analysis:
+            utilizations = [ca.utilization_percent for ca in capacity_analysis]
+            if utilizations:
+                avg_utilization = sum(utilizations) / len(utilizations)
+
+        # Calculate CD eligible percentage
+        cd_eligible_percentage = 0.0
+        if deployment_clusters:
+            feature_flag_count = sum(
+                1 for dc in deployment_clusters
+                if dc.strategy == DeploymentStrategy.FEATURE_FLAG
+            )
+            total_clusters = len(deployment_clusters)
+            if total_clusters > 0:
+                cd_eligible_percentage = (feature_flag_count / total_clusters) * 100
+
+        summary_data = {
+            "risk": {
                 "total": len(red_flags),
-                "critical": critical_count,
-                "moderate": moderate_count,
+                "high": critical_count,
+                "medium": moderate_count,
                 "low": low_count,
             },
-            capacity={
+            "capacity": {
                 "total_sprints": len(capacity_analysis),
                 "passing": passing_sprints,
                 "failing": failing_sprints,
+                "average_utilization": avg_utilization,
             },
-            deployment={
-                "clusters": len(deployment_clusters),
+            "deployment": {
+                "total_clusters": len(deployment_clusters),
+                "cd_eligible_percentage": cd_eligible_percentage,
             },
-        )
+        }
+
+        summary = AnalysisSummary(**summary_data)
+
+        # Persist to SQLite
+        db = await get_db()
+        try:
+            await db.execute(
+                "INSERT INTO analyses (analysis_id, status, created_at, results, summary) VALUES (?, ?, ?, ?, ?)",
+                (analysis_id, "completed", datetime.utcnow().isoformat(), json.dumps(results), json.dumps(summary_data)),
+            )
+            await db.commit()
+        finally:
+            await db.close()
 
         return AnalysisResponse(
             analysis_id=analysis_id,
@@ -152,5 +209,134 @@ async def run_full_analysis(request: AnalysisRequest):
             summary=summary,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+class SaveAnalysisRequest(BaseModel):
+    """Request to save an analysis."""
+
+    name: str
+    year: str
+    quarter: str
+
+
+class SavedAnalysisMetadata(BaseModel):
+    """Metadata for a saved analysis."""
+
+    id: str
+    name: str
+    year: str
+    quarter: str
+    saved_at: str
+    source_file: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    summary: Optional[Dict[str, Any]] = None
+    resources: Optional[Dict[str, Any]] = None
+    projects: Optional[Dict[str, Any]] = None
+
+
+@saved_router.get("", response_model=Dict[str, List[SavedAnalysisMetadata]])
+async def list_saved_analyses():
+    """List all saved analyses."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT analysis_id, status, created_at, summary, metadata FROM analyses ORDER BY created_at DESC"
+        )
+        rows = await cursor.fetchall()
+    finally:
+        await db.close()
+
+    analyses = []
+    for row in rows:
+        meta = json.loads(row["metadata"]) if row["metadata"] else {}
+        summary = json.loads(row["summary"]) if row["summary"] else {}
+        analyses.append(
+            SavedAnalysisMetadata(
+                id=row["analysis_id"],
+                name=meta.get("name", "Unnamed"),
+                year=meta.get("year", ""),
+                quarter=meta.get("quarter", ""),
+                saved_at=row["created_at"],
+                source_file=meta.get("source_file"),
+                metadata=meta or None,
+                summary=summary or None,
+            )
+        )
+
+    return {"analyses": analyses}
+
+
+@saved_router.get("/{analysis_id}")
+async def get_saved_analysis(analysis_id: str):
+    """Get a saved analysis by ID."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM analyses WHERE analysis_id = ?", (analysis_id,))
+        row = await cursor.fetchone()
+    finally:
+        await db.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    return {
+        "id": row["analysis_id"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "results": json.loads(row["results"]),
+        "summary": json.loads(row["summary"]),
+        "metadata": json.loads(row["metadata"]) if row["metadata"] else {},
+    }
+
+
+@saved_router.post("/{analysis_id}/save")
+async def save_analysis(analysis_id: str, request: SaveAnalysisRequest):
+    """Save an analysis with metadata."""
+    meta = json.dumps({
+        "name": request.name,
+        "year": request.year,
+        "quarter": request.quarter,
+        "saved_at": datetime.utcnow().isoformat(),
+    })
+
+    db = await get_db()
+    try:
+        # Check if this analysis already exists
+        cursor = await db.execute("SELECT analysis_id FROM analyses WHERE analysis_id = ?", (analysis_id,))
+        row = await cursor.fetchone()
+        if row:
+            await db.execute("UPDATE analyses SET metadata = ? WHERE analysis_id = ?", (meta, analysis_id))
+        else:
+            # Create a new saved entry
+            saved_id = str(uuid.uuid4())
+            await db.execute(
+                "INSERT INTO analyses (analysis_id, status, created_at, results, summary, metadata) VALUES (?, ?, ?, ?, ?, ?)",
+                (saved_id, "saved", datetime.utcnow().isoformat(), "{}", "{}", meta),
+            )
+            analysis_id = saved_id
+        await db.commit()
+    finally:
+        await db.close()
+
+    return {"id": analysis_id, "status": "saved", "metadata": json.loads(meta)}
+
+
+@saved_router.delete("/{analysis_id}")
+async def delete_saved_analysis(analysis_id: str):
+    """Delete a saved analysis."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT analysis_id FROM analyses WHERE analysis_id = ?", (analysis_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        await db.execute("DELETE FROM analyses WHERE analysis_id = ?", (analysis_id,))
+        await db.commit()
+    finally:
+        await db.close()
+
+    return {"status": "deleted"}

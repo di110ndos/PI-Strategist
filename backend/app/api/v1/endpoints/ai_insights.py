@@ -1,7 +1,6 @@
 """AI Insights endpoint using the AIAdvisor."""
 
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -197,7 +196,11 @@ async def generate_insights(request: InsightsRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
+        error_msg = str(e)
+        # Sanitize: never leak the API key in error responses
+        if settings.anthropic_api_key:
+            error_msg = error_msg.replace(settings.anthropic_api_key, "***")
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {error_msg}")
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -271,4 +274,7 @@ Answer the user's question based on this data. Tailor your responses for a PM/ac
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+        error_msg = str(e)
+        if settings.anthropic_api_key:
+            error_msg = error_msg.replace(settings.anthropic_api_key, "***")
+        raise HTTPException(status_code=500, detail=f"Chat failed: {error_msg}")
