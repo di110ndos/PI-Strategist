@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -10,6 +11,12 @@ try:
     HAS_ANTHROPIC = True
 except ImportError:
     HAS_ANTHROPIC = False
+
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+    HAS_TENACITY = True
+except ImportError:
+    HAS_TENACITY = False
 
 
 @dataclass
@@ -121,7 +128,7 @@ class AIAdvisor:
 
             client = self._get_client()
             message = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-opus-4-6",
                 max_tokens=1000,
                 messages=[
                     {
@@ -192,7 +199,7 @@ Over-allocated Resources: {pi_analysis.overallocated_resources if pi_analysis el
 
             client = self._get_client()
             message = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-opus-4-6",
                 max_tokens=1000,
                 messages=[
                     {
@@ -284,12 +291,31 @@ Only return valid JSON array."""
         return self._build_analysis_context(pi_analysis, capacity_plan, None)
 
     def _call_claude(self, context: str) -> str:
-        """Call Claude API for full analysis."""
+        """Call Claude API for full analysis with retry."""
+        return self._call_claude_with_retry(context)
+
+    def _call_claude_with_retry(self, context: str) -> str:
+        """Inner method that actually calls Claude, wrapped with retry if tenacity is installed."""
+        if HAS_TENACITY:
+            @retry(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, min=2, max=30),
+                retry=retry_if_exception_type((anthropic.APITimeoutError, anthropic.APIConnectionError)) if HAS_ANTHROPIC else retry_if_exception_type(Exception),
+                reraise=True,
+            )
+            def _do_call():
+                return self._raw_call_claude(context)
+            return _do_call()
+        return self._raw_call_claude(context)
+
+    def _raw_call_claude(self, context: str) -> str:
+        """Raw Claude API call."""
         client = self._get_client()
 
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-opus-4-6",
             max_tokens=2000,
+            timeout=120.0,
             messages=[
                 {
                     "role": "user",
@@ -326,15 +352,37 @@ Focus on practical, actionable insights. Be specific with numbers and names from
 
     def _parse_response(self, response: str) -> AIAnalysisResult:
         """Parse Claude's response into structured result."""
-        import re
-
         result = AIAnalysisResult()
 
         try:
-            # Extract JSON from response
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
+            # Try multiple strategies to extract JSON
+            data = None
+
+            # Strategy 1: direct parse
+            try:
+                data = json.loads(response)
+            except json.JSONDecodeError:
+                pass
+
+            # Strategy 2: find ```json ... ``` block
+            if data is None:
+                code_block = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
+                if code_block:
+                    try:
+                        data = json.loads(code_block.group(1))
+                    except json.JSONDecodeError:
+                        pass
+
+            # Strategy 3: greedy brace match
+            if data is None:
+                json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                if json_match:
+                    try:
+                        data = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        pass
+
+            if data:
 
                 result.executive_summary = data.get("executive_summary", "")
                 result.risk_assessment = data.get("risk_assessment", "")
