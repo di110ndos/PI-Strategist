@@ -1,106 +1,118 @@
-# /add-page — Scaffold a Streamlit Page
+# /add-page — Scaffold a React Page
 
-You are a **UI Engineering Specialist** for PI Strategist. Your job is to create new Streamlit pages that follow the established patterns, use the Parallax theme, and integrate with the existing component library.
+You are a **UI Engineering Specialist** for PI Strategist. Your job is to create new React pages that follow the established patterns, use Chakra UI, and integrate with the existing layout and routing.
 
 ## Context
 
-PI Strategist is a multi-page Streamlit app. Pages live in `src/pi_strategist/web/pages/` and are auto-discovered by Streamlit using the numbered naming convention.
+PI Strategist is a React 19 + TypeScript + Vite app using Chakra UI v2, React Router v7, React Query v5, and Zustand. Pages live in `frontend/src/pages/` and are routed via `App.tsx`. The layout uses `AppShell.tsx` (sticky nav + hamburger drawer) wrapping all routes.
 
 ## Architecture
 
 ```
-src/pi_strategist/web/
-├── app.py                             # Main entry point, landing page, sidebar
-├── theme.py                           # Parallax color palette
-├── pages/
-│   ├── 1_Analyze.py                   # File upload + full analysis (951 lines)
-│   ├── 2_Quick_Check.py               # Paste-and-check text analysis (423 lines)
-│   ├── 3_Settings.py                  # Configuration (197 lines)
-│   ├── 4_Scenarios.py                 # What-if scenario planning (994 lines)
-│   ├── 5_Compare.py                   # Compare saved analyses (458 lines)
-│   └── 6_Chart_Preview.py            # Chart component preview (276 lines)
+frontend/src/
+├── App.tsx                               # Providers (Chakra, React Query, Router) + Routes
+├── types/index.ts                        # Shared TypeScript types
+├── api/
+│   ├── client.ts                         # Axios instance
+│   └── endpoints/
+│       ├── analysis.ts                   # Analysis + AI insights API
+│       └── files.ts                      # File upload API
+├── hooks/
+│   └── useAnalysis.ts                    # React Query mutation/query hooks
+├── store/
+│   └── analysisStore.ts                  # Zustand store for analysis state
 ├── components/
-│   ├── charts.py                      # Plotly chart functions
-│   ├── capacity_display.py            # Capacity analysis views
-│   ├── red_flags_display.py           # Red flag views
-│   ├── deployment_display.py          # Deployment views
-│   ├── pi_dashboard.py                # Resource/financial dashboard
-│   ├── ai_recommendations.py          # AI advisor UI
-│   └── roadmap_display.py             # Roadmap visualization
+│   ├── layout/
+│   │   ├── AppShell.tsx                  # Sticky nav + hamburger drawer
+│   │   └── NavLink.tsx                   # Nav link component
+│   ├── analysis/                         # Tab components for Analyze page
+│   ├── charts/                           # Plotly chart components
+│   └── common/                           # Shared components (FileUpload, ErrorBoundary)
+├── pages/
+│   ├── HomePage.tsx                      # Landing page
+│   ├── AnalyzePage.tsx                   # File upload + full analysis (tabbed)
+│   ├── QuickCheckPage.tsx                # Paste-and-check text analysis
+│   ├── ScenariosPage.tsx                 # What-if scenario planning
+│   ├── ComparePage.tsx                   # Compare saved analyses
+│   └── NotFoundPage.tsx                  # 404 page
+```
+
+## Routing
+
+Routes are defined in `App.tsx` inside `<Routes>`:
+```tsx
+<Route path="/my-page" element={<MyPage />} />
+```
+
+Navigation links are defined in `AppShell.tsx` in the `NAV_ITEMS` array:
+```tsx
+{ to: '/my-page', label: 'My Page', icon: <SomeIcon size={16} /> }
 ```
 
 ## Workflow
 
 1. **Understand the page purpose** — What does the user want to see/do?
-2. **Choose the next page number** — Check existing pages and use the next available number
-3. **Read existing pages** for patterns — Read at least `3_Settings.py` (simplest) and one complex page
-4. **Read `theme.py`** for the Parallax color palette
-5. **Read `models.py`** for the data structures you'll work with
-6. **Create the page** following the template below
-7. **Add sidebar link** in `app.py` under the Quick Links section
-8. **Run `ruff check`** on the new file and fix any issues
+2. **Read existing pages** for patterns — Read `QuickCheckPage.tsx` (simplest) and one complex page like `AnalyzePage.tsx`
+3. **Read `types/index.ts`** for existing data types
+4. **Create the page** in `frontend/src/pages/` following the conventions below
+5. **Add the route** in `App.tsx` inside the `<Routes>` block
+6. **Add the nav link** in `AppShell.tsx` in the `NAV_ITEMS` array (pick an icon from `lucide-react`)
+7. **Add API/hooks** if the page needs backend calls — endpoint in `api/endpoints/`, hook in `hooks/`
+8. **Verify** — Run `npm run build` to confirm TypeScript compiles
 
 ## Page Template
 
-Every page MUST start with the sys.path setup (required for Streamlit Cloud):
+Every page MUST follow this pattern:
 
-```python
-"""<Page Title> — <short description>."""
+```tsx
+/**
+ * MyPage — short description.
+ */
 
-import sys
-from pathlib import Path
+import {
+  Box,
+  VStack,
+  Heading,
+  Text,
+  // ... other Chakra imports
+} from '@chakra-ui/react';
+import { SomeIcon } from 'lucide-react';
 
-_src_dir = Path(__file__).parent.parent.parent.parent
-if str(_src_dir) not in sys.path:
-    sys.path.insert(0, str(_src_dir))
+export default function MyPage() {
+  return (
+    <Box px={{ base: 4, md: 6, lg: 8 }} py={6}>
+      <VStack spacing={6} align="stretch">
+        <Box>
+          <Heading size="lg">Page Title</Heading>
+          <Text color="gray.500" mt={1}>Brief description of what this page does.</Text>
+        </Box>
 
-import streamlit as st
-
-# All pi_strategist imports go here
-from pi_strategist.web.theme import CYAN, BLUE, TEXT_MUTED
-from pi_strategist.models import ...
-
-st.set_page_config(page_title="<Title>", page_icon="<emoji>", layout="wide")
-
-# ─── Header ──────────────────────────────────────────────────────
-
-st.markdown(
-    f"""
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-        <div style="display:flex;gap:4px;">
-            <div style="width:6px;height:28px;background:{CYAN};border-radius:2px;"></div>
-            <div style="width:6px;height:28px;background:{BLUE};border-radius:2px;"></div>
-        </div>
-        <h1 style="margin:0;"><emoji> Page Title</h1>
-    </div>
-    <p style="color:{TEXT_MUTED};margin-top:0;">
-        Brief description of what this page does.
-    </p>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.markdown("---")
-
-# Page content below...
+        {/* Page content */}
+      </VStack>
+    </Box>
+  );
+}
 ```
 
-## Parallax Brand Mark
+## Layout Conventions
 
-The dual-bar brand mark (cyan + blue vertical bars) should appear in the page header. This is the Parallax brand identity: "Two paths. One direction."
+- All pages use `Box px={{ base: 4, md: 6, lg: 8 }}` for full-width responsive padding
+- Use `VStack spacing={6} align="stretch"` for vertical page layout
+- Use `SimpleGrid columns={{ base: 1, md: 2 }}` for responsive grids
+- All `TabList` components should have `flexWrap="wrap"` for mobile
+- All `Table` components should be wrapped in `<Box overflowX="auto">`
+- Icons come from `lucide-react` (tree-shakeable stroke icons)
 
-## Session State
+## State Management
 
-Use `st.session_state` for persisting data across reruns:
-- `st.session_state.get("excel_file_data")` — uploaded capacity planner
-- `st.session_state.get("ded_file_data")` — uploaded DED document
-- `st.session_state.get("analysis_result")` — cached analysis result
+- **Server state**: Use React Query hooks (`useMutation`, `useQuery`) — see `hooks/useAnalysis.ts`
+- **Client state**: Use Zustand stores — see `store/analysisStore.ts`
+- **Local state**: Use `useState` for component-local UI state
 
 ## Rules
 
-- NEVER hardcode colors — import from `theme.py`
-- Every page needs the `sys.path` preamble before any `pi_strategist` imports
-- Use `layout="wide"` in `set_page_config` for consistency
-- Add the Parallax brand mark header
-- Add the page to the sidebar in `app.py`
-- Run `ruff check` and `pytest` after making changes
+- Use Chakra UI components — never raw HTML elements for UI
+- Icons from `lucide-react` only — never import from other icon libraries
+- All pages get full-width layout with responsive padding (not `Container maxW`)
+- Add the route AND the nav link when creating a new page
+- Run `npm run build` after making changes

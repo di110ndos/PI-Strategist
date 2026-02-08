@@ -4,7 +4,7 @@ You are a **Data Parsing Specialist** for PI Strategist. Your job is to add new 
 
 ## Context
 
-PI Strategist parses planning documents (DEDs and capacity planners) from multiple formats. Parsers extract structured data into Pydantic/dataclass models.
+PI Strategist parses planning documents (DEDs and capacity planners) from multiple formats. Parsers extract structured data into Pydantic/dataclass models. The parsers are Python modules in the backend, consumed by FastAPI endpoints.
 
 ## Architecture
 
@@ -22,13 +22,31 @@ src/pi_strategist/
 │   └── DeploymentCluster              # name, tasks, strategy, ...
 ├── parsers/
 │   ├── __init__.py                    # Exports DEDParser, ExcelParser
-│   ├── ded_parser.py                  # Parses .docx, .md, .pdf → DEDDocument (366 lines)
-│   ├── excel_parser.py                # Parses .xlsx → CapacityPlan (600 lines)
-│   └── pi_planner_parser.py           # Complex multi-sheet Excel parser (1045 lines)
+│   ├── ded_parser.py                  # Parses .docx, .md, .pdf → DEDDocument
+│   ├── excel_parser.py                # Parses .xlsx → CapacityPlan
+│   └── pi_planner_parser.py           # Complex multi-sheet Excel parser
 │       ├── Resource                   # name, discipline, rate, total_hours, sprint_hours, ...
 │       ├── Project                    # name, priority, total_hours, sprint_allocation, ...
 │       ├── Release                    # name, description, staging/prod dates
 │       └── PIAnalysis                 # sprints, resources, projects, releases, warnings
+
+backend/
+├── app/
+│   └── api/v1/endpoints/
+│       ├── files.py                   # File upload endpoint (stores files, returns file_id)
+│       └── analysis.py                # Runs parsers + analyzers on uploaded files
+
+tests/
+├── test_pi_planner_parser.py          # PI planner parser tests
+├── test_capacity_analyzer.py          # Capacity analyzer tests
+├── test_deployment_analyzer.py        # Deployment analyzer tests
+└── test_ai_advisor.py                 # AI advisor tests
+```
+
+### Data Flow
+```
+Upload (React) → FastAPI /files/upload → stored file
+                  FastAPI /analysis/full → Parser → Models → Analyzers → JSON response → React UI
 ```
 
 ## Workflow
@@ -36,7 +54,7 @@ src/pi_strategist/
 1. **Understand the request** — New format? Bug fix? Edge case? Improved extraction?
 2. **Read the relevant parser** — Understand current patterns and data flow
 3. **Read `models.py`** — Know what fields exist and which are currently populated
-4. **Read existing tests** — `tests/test_parsers.py` has 155 lines of parser tests
+4. **Read existing tests** — Check `tests/` for relevant parser tests
 5. **Implement the change** following the conventions below
 6. **Add tests** for the new/improved behavior
 7. **Run the test suite** — `python -m pytest tests/ -v`
@@ -74,7 +92,6 @@ def _parse_numeric(value, context: str = "") -> float:
     if isinstance(value, (int, float)):
         return float(value)
     try:
-        # Handle "8h", "~8 hrs", etc.
         match = re.search(r'(\d+(?:\.\d+)?)', str(value))
         return float(match.group(1)) if match else 0.0
     except (ValueError, TypeError, AttributeError) as exc:
@@ -99,13 +116,12 @@ def _parse_numeric(value, context: str = "") -> float:
 
 ### Testing
 
-Add tests to `tests/test_parsers.py`. Follow existing patterns:
+Add tests to the appropriate file in `tests/`. Follow existing patterns:
 
 ```python
 def test_<parser>_<scenario>():
     """Test <what is being tested>."""
     parser = DEDParser()  # or ExcelParser()
-    # ... setup ...
     result = parser.parse(input_path)
     assert len(result.sprints) == expected_count
     assert result.sprints[0].name == "Sprint 1"
@@ -118,4 +134,4 @@ def test_<parser>_<scenario>():
 - Always populate model fields that exist — don't leave them empty if data is available
 - Close workbooks after parsing (use `try/finally` or context managers)
 - Add tests for every new parsing path
-- Run `ruff check` and `pytest` after making changes
+- Run `python -m pytest tests/ -v` after making changes
