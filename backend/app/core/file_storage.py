@@ -1,6 +1,5 @@
 """File storage management for uploaded files."""
 
-import json
 import uuid
 import aiofiles
 from pathlib import Path
@@ -31,7 +30,7 @@ class FileStorage:
         self.base_dir = base_dir or settings.upload_dir
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    async def store(self, content: bytes, filename: str, file_type: str) -> StoredFile:
+    async def store(self, content: bytes, filename: str, file_type: str, session_id: str) -> StoredFile:
         """Store uploaded file and persist metadata to SQLite."""
         file_id = str(uuid.uuid4())
         suffix = Path(filename).suffix
@@ -53,8 +52,8 @@ class FileStorage:
         db = await get_db()
         try:
             await db.execute(
-                "INSERT INTO files (file_id, filename, file_type, path, size_bytes, uploaded_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (file_id, filename, file_type, str(file_path), len(content), now.isoformat()),
+                "INSERT INTO files (file_id, session_id, filename, file_type, path, size_bytes, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (file_id, session_id, filename, file_type, str(file_path), len(content), now.isoformat()),
             )
             await db.commit()
         finally:
@@ -62,11 +61,14 @@ class FileStorage:
 
         return stored
 
-    async def get(self, file_id: str) -> Optional[StoredFile]:
-        """Get file metadata by ID from SQLite."""
+    async def get(self, file_id: str, session_id: str) -> Optional[StoredFile]:
+        """Get file metadata by ID, scoped to session."""
         db = await get_db()
         try:
-            cursor = await db.execute("SELECT * FROM files WHERE file_id = ?", (file_id,))
+            cursor = await db.execute(
+                "SELECT * FROM files WHERE file_id = ? AND session_id = ?",
+                (file_id, session_id),
+            )
             row = await cursor.fetchone()
             if not row:
                 return None
@@ -81,31 +83,37 @@ class FileStorage:
         finally:
             await db.close()
 
-    async def get_path(self, file_id: str) -> Optional[Path]:
-        """Get file path by ID."""
-        stored = await self.get(file_id)
+    async def get_path(self, file_id: str, session_id: str) -> Optional[Path]:
+        """Get file path by ID, scoped to session."""
+        stored = await self.get(file_id, session_id)
         return stored.path if stored else None
 
-    async def delete(self, file_id: str) -> bool:
-        """Delete file and metadata."""
-        stored = await self.get(file_id)
+    async def delete(self, file_id: str, session_id: str) -> bool:
+        """Delete file and metadata, scoped to session."""
+        stored = await self.get(file_id, session_id)
         if not stored:
             return False
         if stored.path.exists():
             stored.path.unlink()
         db = await get_db()
         try:
-            await db.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
+            await db.execute(
+                "DELETE FROM files WHERE file_id = ? AND session_id = ?",
+                (file_id, session_id),
+            )
             await db.commit()
         finally:
             await db.close()
         return True
 
-    async def list_files(self) -> list[StoredFile]:
-        """List all stored files."""
+    async def list_files(self, session_id: str) -> list[StoredFile]:
+        """List files for a specific session."""
         db = await get_db()
         try:
-            cursor = await db.execute("SELECT * FROM files ORDER BY uploaded_at DESC")
+            cursor = await db.execute(
+                "SELECT * FROM files WHERE session_id = ? ORDER BY uploaded_at DESC",
+                (session_id,),
+            )
             rows = await cursor.fetchall()
             return [
                 StoredFile(

@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 # Ensure src/ is importable (editable install preferred: `pip install -e .`)
@@ -19,6 +19,7 @@ if src_path not in sys.path:
 
 from app.core.file_storage import file_storage
 from app.core.database import get_db
+from app.core.session import get_session_id
 from app.models.responses import AnalysisResponse, AnalysisSummary
 
 router = APIRouter()
@@ -68,7 +69,10 @@ class AnalysisRequest(BaseModel):
 
 
 @router.post("/full", response_model=AnalysisResponse)
-async def run_full_analysis(request: AnalysisRequest):
+async def run_full_analysis(
+    request: AnalysisRequest,
+    session_id: str = Depends(get_session_id),
+):
     """Run full DED and capacity analysis."""
     # Validate at least one file is provided
     if not request.ded_file_id and not request.excel_file_id:
@@ -82,12 +86,12 @@ async def run_full_analysis(request: AnalysisRequest):
     excel_path = None
 
     if request.ded_file_id:
-        ded_path = await file_storage.get_path(request.ded_file_id)
+        ded_path = await file_storage.get_path(request.ded_file_id, session_id)
         if not ded_path:
             raise HTTPException(status_code=404, detail="DED file not found")
 
     if request.excel_file_id:
-        excel_path = await file_storage.get_path(request.excel_file_id)
+        excel_path = await file_storage.get_path(request.excel_file_id, session_id)
         if not excel_path:
             raise HTTPException(status_code=404, detail="Excel file not found")
 
@@ -195,8 +199,8 @@ async def run_full_analysis(request: AnalysisRequest):
         db = await get_db()
         try:
             await db.execute(
-                "INSERT INTO analyses (analysis_id, status, created_at, results, summary) VALUES (?, ?, ?, ?, ?)",
-                (analysis_id, "completed", now.isoformat(), json.dumps(results), json.dumps(summary_data)),
+                "INSERT INTO analyses (analysis_id, session_id, status, created_at, results, summary) VALUES (?, ?, ?, ?, ?, ?)",
+                (analysis_id, session_id, "completed", now.isoformat(), json.dumps(results), json.dumps(summary_data)),
             )
             await db.commit()
         finally:
@@ -240,12 +244,13 @@ class SavedAnalysisMetadata(BaseModel):
 
 
 @saved_router.get("", response_model=Dict[str, List[SavedAnalysisMetadata]])
-async def list_saved_analyses():
-    """List all saved analyses."""
+async def list_saved_analyses(session_id: str = Depends(get_session_id)):
+    """List all saved analyses for the current session."""
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT analysis_id, status, created_at, summary, metadata FROM analyses ORDER BY created_at DESC"
+            "SELECT analysis_id, status, created_at, summary, metadata FROM analyses WHERE session_id = ? ORDER BY created_at DESC",
+            (session_id,),
         )
         rows = await cursor.fetchall()
     finally:
@@ -272,11 +277,14 @@ async def list_saved_analyses():
 
 
 @saved_router.get("/{analysis_id}")
-async def get_saved_analysis(analysis_id: str):
-    """Get a saved analysis by ID."""
+async def get_saved_analysis(analysis_id: str, session_id: str = Depends(get_session_id)):
+    """Get a saved analysis by ID, scoped to session."""
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT * FROM analyses WHERE analysis_id = ?", (analysis_id,))
+        cursor = await db.execute(
+            "SELECT * FROM analyses WHERE analysis_id = ? AND session_id = ?",
+            (analysis_id, session_id),
+        )
         row = await cursor.fetchone()
     finally:
         await db.close()
@@ -295,7 +303,11 @@ async def get_saved_analysis(analysis_id: str):
 
 
 @saved_router.post("/{analysis_id}/save")
-async def save_analysis(analysis_id: str, request: SaveAnalysisRequest):
+async def save_analysis(
+    analysis_id: str,
+    request: SaveAnalysisRequest,
+    session_id: str = Depends(get_session_id),
+):
     """Save an analysis with metadata."""
     meta = json.dumps({
         "name": request.name,
@@ -306,17 +318,23 @@ async def save_analysis(analysis_id: str, request: SaveAnalysisRequest):
 
     db = await get_db()
     try:
-        # Check if this analysis already exists
-        cursor = await db.execute("SELECT analysis_id FROM analyses WHERE analysis_id = ?", (analysis_id,))
+        # Check if this analysis already exists for this session
+        cursor = await db.execute(
+            "SELECT analysis_id FROM analyses WHERE analysis_id = ? AND session_id = ?",
+            (analysis_id, session_id),
+        )
         row = await cursor.fetchone()
         if row:
-            await db.execute("UPDATE analyses SET metadata = ? WHERE analysis_id = ?", (meta, analysis_id))
+            await db.execute(
+                "UPDATE analyses SET metadata = ? WHERE analysis_id = ? AND session_id = ?",
+                (meta, analysis_id, session_id),
+            )
         else:
             # Create a new saved entry
             saved_id = str(uuid.uuid4())
             await db.execute(
-                "INSERT INTO analyses (analysis_id, status, created_at, results, summary, metadata) VALUES (?, ?, ?, ?, ?, ?)",
-                (saved_id, "saved", datetime.utcnow().isoformat(), "{}", "{}", meta),
+                "INSERT INTO analyses (analysis_id, session_id, status, created_at, results, summary, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (saved_id, session_id, "saved", datetime.utcnow().isoformat(), "{}", "{}", meta),
             )
             analysis_id = saved_id
         await db.commit()
@@ -327,15 +345,21 @@ async def save_analysis(analysis_id: str, request: SaveAnalysisRequest):
 
 
 @saved_router.delete("/{analysis_id}")
-async def delete_saved_analysis(analysis_id: str):
-    """Delete a saved analysis."""
+async def delete_saved_analysis(analysis_id: str, session_id: str = Depends(get_session_id)):
+    """Delete a saved analysis, scoped to session."""
     db = await get_db()
     try:
-        cursor = await db.execute("SELECT analysis_id FROM analyses WHERE analysis_id = ?", (analysis_id,))
+        cursor = await db.execute(
+            "SELECT analysis_id FROM analyses WHERE analysis_id = ? AND session_id = ?",
+            (analysis_id, session_id),
+        )
         row = await cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Analysis not found")
-        await db.execute("DELETE FROM analyses WHERE analysis_id = ?", (analysis_id,))
+        await db.execute(
+            "DELETE FROM analyses WHERE analysis_id = ? AND session_id = ?",
+            (analysis_id, session_id),
+        )
         await db.commit()
     finally:
         await db.close()

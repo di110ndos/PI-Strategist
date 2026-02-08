@@ -5,10 +5,11 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.config import settings
+from app.core.rate_limiter import rate_limit_ai
 
 # Ensure src/ is importable (editable install preferred: `pip install -e .`)
 src_path = str(Path(__file__).parent.parent.parent.parent.parent / "src")
@@ -113,7 +114,7 @@ class _DictProxy:
         return val
 
 
-@router.post("/insights", response_model=InsightsResponse)
+@router.post("/insights", response_model=InsightsResponse, dependencies=[Depends(rate_limit_ai)])
 async def generate_insights(request: InsightsRequest):
     """Generate AI-powered insights for PI analysis data."""
 
@@ -205,7 +206,7 @@ async def generate_insights(request: InsightsRequest):
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {error_msg}")
 
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat", response_model=ChatResponse, dependencies=[Depends(rate_limit_ai)])
 async def chat(request: ChatRequest):
     """Follow-up chat about AI analysis results."""
 

@@ -108,8 +108,9 @@ temp/
 # Jupyter
 .ipynb_checkpoints/
 
-# Backend uploads & database
+# Backend uploads, data & database
 backend/uploads/
+backend/data/
 *.db
 
 # Windows artifacts

@@ -21,8 +21,14 @@ class Settings(BaseSettings):
     upload_dir: Path = Path("uploads")
     max_upload_size_mb: int = 50
 
+    # Data directory (database, etc.)
+    data_dir: Path = Path("data")
+
     # Session Settings
     session_ttl_hours: int = 24
+
+    # Rate Limiting
+    rate_limit_ai_per_minute: int = 10
 
     # AI Settings
     anthropic_api_key: Optional[str] = None

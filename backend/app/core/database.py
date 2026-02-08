@@ -1,15 +1,27 @@
 """Async SQLite database for persisting files and analyses."""
 
+import logging
+
 import aiosqlite
 from pathlib import Path
 
 from app.config import settings
 
-DB_PATH = settings.upload_dir / "pi_strategist.db"
+logger = logging.getLogger(__name__)
+
+DB_PATH = settings.data_dir / "pi_strategist.db"
 
 _CREATE_TABLES = """
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id TEXT PRIMARY KEY,
+    session_token TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    last_active_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS files (
     file_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
     filename TEXT NOT NULL,
     file_type TEXT NOT NULL,
     path TEXT NOT NULL,
@@ -19,15 +31,31 @@ CREATE TABLE IF NOT EXISTS files (
 
 CREATE TABLE IF NOT EXISTS analyses (
     analysis_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'completed',
     created_at TEXT NOT NULL,
     results TEXT NOT NULL,
     summary TEXT NOT NULL,
     metadata TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_files_session ON files(session_id);
+CREATE INDEX IF NOT EXISTS idx_analyses_session ON analyses(session_id);
 """
 
 _initialized = False
+
+
+async def _migrate_add_session_columns(db: aiosqlite.Connection) -> None:
+    """Add session_id column to existing tables if missing."""
+    for table in ("files", "analyses"):
+        cursor = await db.execute(f"PRAGMA table_info({table})")
+        columns = [row[1] for row in await cursor.fetchall()]
+        if "session_id" not in columns:
+            logger.info("Migrating table %s: adding session_id column", table)
+            await db.execute(
+                f"ALTER TABLE {table} ADD COLUMN session_id TEXT NOT NULL DEFAULT ''"
+            )
 
 
 async def init_db() -> None:
@@ -36,6 +64,18 @@ async def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(DB_PATH))
     try:
+        # Enable WAL mode for better concurrent access
+        await db.execute("PRAGMA journal_mode=WAL")
+
+        # Check if tables exist already (migration path)
+        cursor = await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='files'"
+        )
+        existing = await cursor.fetchone()
+        if existing:
+            await _migrate_add_session_columns(db)
+            await db.commit()
+
         await db.executescript(_CREATE_TABLES)
         await db.commit()
     finally:

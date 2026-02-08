@@ -1,11 +1,12 @@
 """File upload and management endpoints."""
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Literal
 
 from app.core.file_storage import file_storage
+from app.core.session import get_session_id
 from app.config import settings
 
 router = APIRouter()
@@ -39,6 +40,7 @@ MAGIC_BYTES = {
 async def upload_file(
     file: UploadFile = File(...),
     file_type: Literal["ded", "excel"] = Query(..., description="Type of file being uploaded"),
+    session_id: str = Depends(get_session_id),
 ):
     """Upload a DED document or Excel capacity planner."""
     # Validate file size
@@ -76,7 +78,7 @@ async def upload_file(
         )
 
     # Store file
-    stored = await file_storage.store(content, filename, file_type)
+    stored = await file_storage.store(content, filename, file_type, session_id)
 
     return FileUploadResponse(
         file_id=stored.file_id,
@@ -88,9 +90,9 @@ async def upload_file(
 
 
 @router.get("", response_model=FileListResponse)
-async def list_files():
-    """List all uploaded files."""
-    files = await file_storage.list_files()
+async def list_files(session_id: str = Depends(get_session_id)):
+    """List all uploaded files for the current session."""
+    files = await file_storage.list_files(session_id)
     return FileListResponse(
         files=[
             FileUploadResponse(
@@ -106,8 +108,8 @@ async def list_files():
 
 
 @router.delete("/{file_id}")
-async def delete_file(file_id: str):
+async def delete_file(file_id: str, session_id: str = Depends(get_session_id)):
     """Delete an uploaded file."""
-    if not await file_storage.delete(file_id):
+    if not await file_storage.delete(file_id, session_id):
         raise HTTPException(status_code=404, detail="File not found")
     return {"status": "deleted", "file_id": file_id}
