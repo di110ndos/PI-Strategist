@@ -15,7 +15,15 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # CORS Settings
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:5173"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+        "http://localhost:3004",
+        "http://localhost:3005",
+        "http://localhost:5173",
+    ]
 
     # File Storage
     upload_dir: Path = Path("uploads")

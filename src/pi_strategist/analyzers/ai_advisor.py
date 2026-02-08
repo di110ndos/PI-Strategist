@@ -314,7 +314,7 @@ Only return valid JSON array."""
 
         message = client.messages.create(
             model="claude-opus-4-6",
-            max_tokens=2000,
+            max_tokens=8192,
             timeout=120.0,
             messages=[
                 {
@@ -343,7 +343,9 @@ Provide your analysis in the following JSON format:
   "key_metrics_commentary": "Commentary on the key metrics"
 }}
 
-Focus on practical, actionable insights. Be specific with numbers and names from the data."""
+Focus on practical, actionable insights. Be specific with numbers and names from the data.
+Keep descriptions concise (2-3 sentences each). Limit to 5 recommendations max.
+Return ONLY the JSON object — no markdown fences, no commentary before or after."""
                 }
             ]
         )
@@ -364,9 +366,9 @@ Focus on practical, actionable insights. Be specific with numbers and names from
             except json.JSONDecodeError:
                 pass
 
-            # Strategy 2: find ```json ... ``` block
+            # Strategy 2: find ```json ... ``` block (greedy to capture full JSON)
             if data is None:
-                code_block = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
+                code_block = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response, re.DOTALL)
                 if code_block:
                     try:
                         data = json.loads(code_block.group(1))
@@ -381,6 +383,35 @@ Focus on practical, actionable insights. Be specific with numbers and names from
                         data = json.loads(json_match.group())
                     except json.JSONDecodeError:
                         pass
+
+            # Strategy 4: repair truncated JSON (max_tokens cut-off)
+            if data is None:
+                json_start = response.find('{')
+                if json_start >= 0:
+                    fragment = response[json_start:]
+                    # Try closing open braces/brackets to make it parseable
+                    for attempt in range(5):
+                        open_braces = fragment.count('{') - fragment.count('}')
+                        open_brackets = fragment.count('[') - fragment.count(']')
+                        # Truncate any partial string value
+                        last_quote = fragment.rfind('"')
+                        if last_quote > 0:
+                            # Check if it's an unclosed string
+                            after_last = fragment[last_quote + 1:].strip()
+                            if not after_last or after_last[0] not in ':,}]':
+                                fragment = fragment[:last_quote] + '..."'
+                        fragment = fragment.rstrip(', \t\n\r')
+                        fragment += ']' * max(0, open_brackets) + '}' * max(0, open_braces)
+                        try:
+                            data = json.loads(fragment)
+                            break
+                        except json.JSONDecodeError:
+                            # Strip last key-value pair and retry
+                            last_comma = fragment.rfind(',')
+                            if last_comma > 0:
+                                fragment = fragment[:last_comma]
+                            else:
+                                break
 
             if data:
 

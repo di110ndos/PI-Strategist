@@ -2,7 +2,7 @@
  * API client for communicating with the FastAPI backend.
  */
 
-import axios from 'axios';
+import axios, { type AxiosRequestConfig } from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -38,12 +38,26 @@ apiClient.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
-    // Handle common errors
+  async (error) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
+
+    // On 401, clear stale tokens and retry once (server will issue fresh session)
+    if (error.response?.status === 401 && !originalRequest._retried) {
+      originalRequest._retried = true;
+      localStorage.removeItem(SESSION_ID_KEY);
+      localStorage.removeItem(SESSION_TOKEN_KEY);
+      // Remove stale headers so middleware creates a new session
+      delete originalRequest.headers?.['X-Session-ID'];
+      delete originalRequest.headers?.['X-Session-Token'];
+      return apiClient(originalRequest);
+    }
+
+    // Already retried or non-401 error
     if (error.response?.status === 401) {
       localStorage.removeItem(SESSION_ID_KEY);
       localStorage.removeItem(SESSION_TOKEN_KEY);
     }
+
     // Extract detail message from FastAPI error responses
     const detail = error.response?.data?.detail;
     if (detail) {
